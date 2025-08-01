@@ -1,0 +1,20 @@
+name: Unit tests
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install
+      - run: uv sync --group dev
+      - run: uv run pytest
