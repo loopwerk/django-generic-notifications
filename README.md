@@ -80,7 +80,7 @@ Create a cron job to send daily digests:
 0 9 * * * cd /path/to/project && uv run ./manage.py send_digest_emails --frequency daily
 ```
 
-When you add custom email frequencies you’ll have to run `send_digest_emails` for them as well. For example, if you created a weekly digests:
+When you add custom email frequencies you’ll have to run `send_digest_emails` for them as well. For example, if you created a weekly digest:
 
 ```bash
 # Send weekly digest every Monday at 9 AM
@@ -95,13 +95,15 @@ All notification types default to daily digest, except for `SystemMessage` which
 
 ```python
 from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency
+from generic_notifications.channels import EmailChannel
 from generic_notifications.frequencies import RealtimeFrequency
+from myapp.notifications import CommentNotification
 
 # Disable email channel for comment notifications
 DisabledNotificationTypeChannel.objects.create(
     user=user,
-    notification_type="comment",
-    channel="email"
+    notification_type=CommentNotification.key,
+    channel=EmailChannel.key
 )
 
 # Change to realtime digest for a notification type
