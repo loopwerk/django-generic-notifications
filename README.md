@@ -51,12 +51,6 @@ class CommentNotification(NotificationType):
     key = "comment"
     name = "Comment Notifications"
     description = "When someone comments on your posts"
-
-    def get_subject(self, notification):
-        return f"{notification.actor.get_full_name()} commented on your post"
-
-    def get_text(self, notification):
-        return f"{notification.actor.get_full_name()} left a comment: {notification.metadata.get('preview', '')}"
 ```
 
 ### 2. Send a notification
@@ -71,10 +65,9 @@ notification = send_notification(
     notification_type=CommentNotification,
     actor=comment.user,
     target=post,
+    subject=f"{comment.user.get_full_name()} commented on your post",
+    text=f"{comment.user.get_full_name()} left a comment: {comment.text[:100]}",
     url=f"/posts/{post.id}#comment-{comment.id}",
-    metadata={
-        'preview': comment.text[:100]
-    }
 )
 ```
 
