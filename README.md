@@ -254,7 +254,9 @@ class CommentNotification(NotificationType):
 
 The `should_save` method is called before saving each notification. Return `False` to prevent creating a new notification and instead update an existing one. This gives you complete control over grouping logic - you might group by time windows, actors, targets, or any other criteria.
 
-### Performance Considerations
+## Performance Considerations
+
+### Accessing `notification.target`
 
 While you can store any object into a notification's `target` field, it's usually not a great idea to use this field to dynamically create the notification's subject and text, as the `target` generic relationship can't be prefetched more than one level deep.
 
@@ -280,6 +282,12 @@ class CommentNotificationType(NotificationType):
           return f'{actor_name} commented on your article "{article.title}": "{comment_text}"'
 
 ```
+
+The problem is `target.article`, which cannot be prefetched and thus causes another query for every notification. This is why it’s better to store the subject, text and url in the notification itself, rather than relying on `target` dynamically.
+
+### Non-blocking email sending
+
+The email channel (EmailChannel) will send real-time emails using Django’s built-in `send_mail` method. This is a blocking function call, meaning that while a connection with the SMTP server is made and the email is sent off, the process that’s sending the notification has to wait. This is not ideal, but easily solved by using something like [django-mailer](https://github.com/pinax/django-mailer/), which provides a queueing backend for `send_mail`. This means that sending email no longer is a blocking action
 
 ## Example app
 
