@@ -8,3 +8,4 @@ wheels/
 .claude
 .pytest_cache
 example/db.sqlite3
+/uv.lock
