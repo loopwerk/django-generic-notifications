@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static notification_utils %}
+
+{% block title %}
+  Notification settings
+{% endblock title %}
+
+{% block body %}
+  <div class="mb-8">
+    <h1 class="text-xl">Notification settings</h1>
+    <p>Configure how you wish to receive notifications.</p>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="overflow-x-auto">
+      <table class="table table-zebra">
+        <thead>
+          <tr>
+            <th>Notification Type</th>
+            {% for channel_key, channel in channels.items %}<th class="font-semibold text-center w-16">{{ channel.name }}</th>{% endfor %}
+            {% if "email" in channels %}<th class="font-semibold text-center w-48">Email Frequency</th>{% endif %}
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for type_data in settings_data %}
+            <tr x-data="{ emailEnabled: {{ type_data.channels.email.enabled|yesno:'true,false' }} }">
+              <!-- Notification Type Name -->
+              <td>
+                <div class="font-medium">{{ type_data.notification_type.name }}</div>
+                <div class="text-sm text-base-content/60">{{ type_data.notification_type.description }}</div>
+              </td>
+
+              <!-- Channel Checkboxes -->
+              {% for channel_key, channel in channels.items %}
+                <td class="text-center">
+                  {% with channel_data=type_data.channels|dict_get:channel_key %}
+                    <input type="checkbox"
+                           name="{{ type_data.notification_type.key }}_{{ channel_key }}"
+                           class="checkbox checkbox-primary"
+                           {% if channel_data.enabled %}checked{% endif %}
+                           {% if channel_data.required %}disabled{% endif %}
+                           {% if channel_key == 'email' %}@change="emailEnabled = $event.target.checked"{% endif %}
+                           {% if channel_data.required %}title="Required"{% endif %} />
+                  {% endwith %}
+                </td>
+              {% endfor %}
+
+              <!-- Email Frequency Select -->
+              {% if "email" in channels %}
+                <td class="text-center">
+                  <select name="{{ type_data.notification_type.key }}_frequency"
+                          class="select select-bordered select-sm"
+                          :disabled="!emailEnabled"
+                          :class="{ 'opacity-50': !emailEnabled }">
+                    {% for freq_key, frequency in frequencies.items %}
+                      <option value="{{ freq_key }}" {% if freq_key == type_data.email_frequency %}selected{% endif %}>{{ frequency.name }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <button type="submit" class="btn btn-primary mt-8">Save Settings</button>
+  </form>
+{% endblock body %}

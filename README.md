@@ -117,6 +117,8 @@ EmailFrequency.objects.update_or_create(
 )
 ```
 
+This project doesn’t come with a UI (view + template) for managing user preferences, but an example UI is provided in the example app.
+
 ## Custom Channels
 
 Create custom delivery channels:
@@ -252,7 +254,7 @@ class CommentNotification(NotificationType):
 
 The `should_save` method is called before saving each notification. Return `False` to prevent creating a new notification and instead update an existing one. This gives you complete control over grouping logic - you might group by time windows, actors, targets, or any other criteria.
 
-## Performance Considerations
+### Performance Considerations
 
 While you can store any object into a notification's `target` field, it's usually not a great idea to use this field to dynamically create the notification's subject and text, as the `target` generic relationship can't be prefetched more than one level deep.
 
@@ -278,6 +280,18 @@ class CommentNotificationType(NotificationType):
           return f'{actor_name} commented on your article "{article.title}": "{comment_text}"'
 
 ```
+
+## Example app
+
+An example app is provided, which shows how to create a custom notification type, how to send a notification, it has a nice looking notification center with unread notifications as well as an archive of all read notifications, plus a settings view where you can manage notification preferences.
+
+```bash
+cd example
+uv run ./manage.py migrate
+uv run ./manage.py runserver
+```
+
+Then open http://127.0.0.1:8000/.
 
 ## Development
 

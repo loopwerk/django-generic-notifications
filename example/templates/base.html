@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      {% block title %}
+        Django Generic Notifications Example
+      {% endblock title %}
+    </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  </head>
+  <body>
+    <div class="navbar bg-base-100">
+      <div class="navbar-start"></div>
+      <div class="navbar-center">
+        <ul class="menu menu-horizontal px-1">
+          <li>
+            <a href="{% url 'home' %}">Home</a>
+          </li>
+          <li>
+            <div class="indicator">
+              {% if unread_notifications %}<span class="indicator-item badge badge-secondary">{{ unread_notifications }}</span>{% endif %}
+              <a href="{% url 'notifications' %}">Notifications</a>
+            </div>
+          </li>
+          <li>
+            <a href="{% url 'notification-settings' %}">Settings</a>
+          </li>
+        </ul>
+      </div>
+      <div class="navbar-end"></div>
+    </div>
+
+    <main class="container mx-auto px-4 py-8">
+      {% block body %}
+      {% endblock body %}
+    </main>
+  </body>
+</html>

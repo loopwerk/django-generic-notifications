@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Django Generic Notifications Example
+{% endblock title %}
+
+{% block body %}
+  <div class="hero min-h-[50vh] bg-base-200 rounded-lg">
+    <div class="hero-content text-center">
+      <div class="max-w-md">
+        <h1 class="text-5xl font-bold">Welcome!</h1>
+        <p class="py-6">
+          This is an example app demonstrating the django-generic-notifications
+          package. You can send test notifications, view them in the notification
+          center, and configure your preferences.
+        </p>
+
+        <form method="post" class="space-y-4">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary">Send Test Notification</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock body %}

@@ -63,7 +63,7 @@ def register(cls: Type[NotificationType]) -> Type[NotificationType]:
             description = "You received a comment"
 
             def get_subject(self, notification):
-                return f"{notification.actor.name} commented on your preset"
+                return f"{notification.actor.name} commented on your article"
     """
     # Register the class
     registry.register_type(cls)

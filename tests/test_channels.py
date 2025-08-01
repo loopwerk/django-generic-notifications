@@ -125,7 +125,7 @@ class EmailChannelTest(TestCase):
         # Should fallback to "realtime" string
         self.assertEqual(frequency.key, "realtime")
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_process_realtime_frequency(self):
         notification = Notification.objects.create(
             recipient=self.user, notification_type="test_type", channels=["website", "email"]

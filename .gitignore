@@ -6,3 +6,5 @@ wheels/
 *.egg-info
 .venv
 .claude
+.pytest_cache
+example/db.sqlite3

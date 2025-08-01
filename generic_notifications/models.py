@@ -140,7 +140,7 @@ class Notification(models.Model):
     # Related data
     actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="notifications_sent")
 
-    # Generic relation to link to any object (preset, comment, etc)
+    # Generic relation to link to any object (article, comment, etc)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     object_id = models.PositiveIntegerField(null=True, blank=True)
     target = GenericForeignKey("content_type", "object_id")
