@@ -80,13 +80,6 @@ Create a cron job to send daily digests:
 0 9 * * * cd /path/to/project && uv run ./manage.py send_digest_emails --frequency daily
 ```
 
-When you add custom email frequencies you’ll have to run `send_digest_emails` for them as well. For example, if you created a weekly digest:
-
-```bash
-# Send weekly digest every Monday at 9 AM
-0 9 * * 1 cd /path/to/project && uv run ./manage.py send_digest_emails --frequency weekly
-```
-
 ## User Preferences
 
 By default every user gets notifications of all registered types delivered to every registered channel, but users can opt-out of receiving notification types, per channel.
@@ -114,7 +107,7 @@ EmailFrequency.objects.update_or_create(
 )
 ```
 
-This project doesn’t come with a UI (view + template) for managing user preferences, but an example UI is provided in the example app.
+This project doesn’t come with a UI (view + template) for managing user preferences, but an example is provided in the [example app](#example-app).
 
 ## Custom Channels
 
@@ -149,6 +142,13 @@ class WeeklyFrequency(NotificationFrequency):
     name = "Weekly digest"
     is_realtime = False
     description = "Receive a weekly summary every Monday"
+```
+
+When you add custom email frequencies you’ll have to run `send_digest_emails` for them as well. For example, if you created that weekly digest:
+
+```bash
+# Send weekly digest every Monday at 9 AM
+0 9 * * 1 cd /path/to/project && uv run ./manage.py send_digest_emails --frequency weekly
 ```
 
 ## Email Templates
@@ -306,9 +306,6 @@ Then open http://127.0.0.1:8000/.
 # Clone the repository
 git clone https://github.com/loopwerk/django-generic-notifications.git
 cd django-generic-notifications
-
-# Install dependencies with uv
-uv sync
 ```
 
 ### Testing
