@@ -152,7 +152,6 @@ class EmailChannel(NotificationChannel):
                 "target": notification.target,
             }
 
-            # Try to load custom templates
             subject_template = f"notifications/email/realtime/{notification.notification_type}_subject.txt"
             html_template = f"notifications/email/realtime/{notification.notification_type}.html"
             text_template = f"notifications/email/realtime/{notification.notification_type}.txt"
@@ -229,9 +228,13 @@ class EmailChannel(NotificationChannel):
                 "frequency": frequency,
             }
 
+            subject_template = "notifications/email/digest/subject.txt"
+            html_template = "notifications/email/digest/message.html"
+            text_template = "notifications/email/digest/message.txt"
+
             # Load subject
             try:
-                subject = render_to_string("notifications/email/digest/subject.txt", context).strip()
+                subject = render_to_string(subject_template, context).strip()
             except Exception:
                 # Fallback subject
                 frequency_name = frequency.name if frequency else "Digest"
@@ -239,14 +242,14 @@ class EmailChannel(NotificationChannel):
 
             # Load HTML message
             try:
-                html_message = render_to_string("notifications/email/digest/message.html", context)
+                html_message = render_to_string(html_template, context)
             except Exception:
                 html_message = None
 
             # Load plain text message
             text_message: str
             try:
-                text_message = render_to_string("notifications/email/digest/message.txt", context)
+                text_message = render_to_string(text_template, context)
             except Exception:
                 # Fallback if template doesn't exist
                 message_lines = [f"You have {notifications.count()} new notifications:"]
