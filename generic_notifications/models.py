@@ -78,7 +78,7 @@ class DisabledNotificationTypeChannel(models.Model):
 class EmailFrequency(models.Model):
     """
     Email delivery frequency preference per notification type.
-    Default is realtime if no row exists.
+    Default is `NotificationType.default_email_frequency` if no row exists.
     """
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="email_frequencies")

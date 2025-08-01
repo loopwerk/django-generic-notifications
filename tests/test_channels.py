@@ -161,7 +161,7 @@ class EmailChannelTest(TestCase):
         notification.refresh_from_db()
         self.assertIsNone(notification.email_sent_at)
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_email_now_basic(self):
         notification = Notification.objects.create(
             recipient=self.user, notification_type="test_type", subject="Test Subject", text="Test message"
@@ -176,13 +176,13 @@ class EmailChannelTest(TestCase):
         self.assertEqual(email.to, [self.user.email])
         self.assertEqual(email.subject, "Test Subject")
         self.assertEqual(email.body, "Test message")
-        self.assertEqual(email.from_email, "test@presets.audio")
+        self.assertEqual(email.from_email, "test@example.com")
 
         # Check notification was marked as sent
         notification.refresh_from_db()
         self.assertIsNotNone(notification.email_sent_at)
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_email_now_uses_get_methods(self):
         # Create notification without stored subject/text to test dynamic generation
         notification = Notification.objects.create(recipient=self.user, notification_type="test_type")
@@ -198,7 +198,7 @@ class EmailChannelTest(TestCase):
         self.assertEqual(email.subject, "A test notification type")
         self.assertEqual(email.body, "")
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     @patch("generic_notifications.channels.render_to_string")
     def test_send_email_now_with_template(self, mock_render):
         # Set up mock to return different values for different templates
@@ -247,7 +247,7 @@ class EmailChannelTest(TestCase):
         self.assertEqual(len(email.alternatives), 1)  # type: ignore
         self.assertEqual(email.alternatives[0][0], "<html>Test HTML</html>")  # type: ignore
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_email_now_template_error_fallback(self):
         notification = Notification.objects.create(
             recipient=self.user, notification_type="test_type", subject="Test Subject"
@@ -262,7 +262,7 @@ class EmailChannelTest(TestCase):
         self.assertEqual(email.subject, "Test Subject")
         self.assertEqual(len(email.alternatives), 0)  # type: ignore[attr-defined]  # No HTML alternative
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_empty_queryset(self):
         # No notifications exist, so digest should not send anything
         empty_notifications = Notification.objects.none()
@@ -271,7 +271,7 @@ class EmailChannelTest(TestCase):
         # No email should be sent when no notifications exist
         self.assertEqual(len(mail.outbox), 0)
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_basic(self):
         # Set user to daily frequency to prevent realtime sending
         EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
@@ -297,7 +297,7 @@ class EmailChannelTest(TestCase):
             notification.refresh_from_db()
             self.assertIsNotNone(notification.email_sent_at)
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_with_frequency(self):
         # Set user to daily frequency to prevent realtime sending
         EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
@@ -311,7 +311,7 @@ class EmailChannelTest(TestCase):
         email = mail.outbox[0]
         self.assertIn("1 new notifications", email.subject)
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_without_frequency(self):
         # Set user to daily frequency to prevent realtime sending
         EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
@@ -325,7 +325,7 @@ class EmailChannelTest(TestCase):
         email = mail.outbox[0]
         self.assertIn("Digest - 1 new notifications", email.subject)
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_text_limit(self):
         # Set user to daily frequency to prevent realtime sending
         EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
@@ -345,7 +345,7 @@ class EmailChannelTest(TestCase):
         email = mail.outbox[0]
         self.assertIn("15 new notifications", email.subject)
 
-    @override_settings(DEFAULT_FROM_EMAIL="test@presets.audio")
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     @patch("generic_notifications.channels.render_to_string")
     def test_send_digest_emails_with_html_template(self, mock_render):
         mock_render.return_value = "<html>Digest HTML</html>"

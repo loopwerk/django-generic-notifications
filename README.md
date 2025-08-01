@@ -45,14 +45,12 @@ uv run ./manage.py migrate generic_notifications
 ```python
 # myapp/notifications.py
 from generic_notifications.types import NotificationType, register
-from generic_notifications.frequencies import DailyFrequency
 
 @register
 class CommentNotification(NotificationType):
     key = "comment"
     name = "Comment Notifications"
     description = "When someone comments on your posts"
-    default_email_frequency = DailyFrequency
 
     def get_subject(self, notification):
         return f"{notification.actor.get_full_name()} commented on your post"
@@ -89,18 +87,22 @@ Create a cron job to send daily digests:
 0 9 * * * cd /path/to/project && uv run ./manage.py send_digest_emails --frequency daily
 ```
 
-For weekly digests (e.g., Mondays at 9 AM):
+When you add custom email frequencies you’ll have to run `send_digest_emails` for them as well. For example, if you created a weekly digests:
 
 ```bash
+# Send weekly digest every Monday at 9 AM
 0 9 * * 1 cd /path/to/project && uv run ./manage.py send_digest_emails --frequency weekly
 ```
 
 ## User Preferences
 
-Users can control their notification preferences:
+By default every user gets notifications of all registered types delivered to every registered channel, but users can opt-out of receiving notification types, per channel.
+
+All notification types default to daily digest, except for `SystemMessage` which defaults to real-time. Users can choose  different frequency per notification type.
 
 ```python
 from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency
+from generic_notifications.frequencies import RealtimeFrequency
 
 # Disable email channel for comment notifications
 DisabledNotificationTypeChannel.objects.create(
@@ -109,11 +111,11 @@ DisabledNotificationTypeChannel.objects.create(
     channel="email"
 )
 
-# Change to weekly digest for a notification type
+# Change to realtime digest for a notification type
 EmailFrequency.objects.update_or_create(
     user=user,
     notification_type="comment",
-    defaults={'frequency': 'weekly'}
+    defaults={'frequency': RealtimeFrequency.key}
 )
 ```
 
