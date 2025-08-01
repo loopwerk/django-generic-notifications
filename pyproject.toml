@@ -1,0 +1,59 @@
+[project]
+name = "django-generic-notifications"
+version = "1.0.0"
+description = "A flexible, multi-channel notification system for Django applications with built-in support for email digests, user preferences, and extensible delivery channels."
+authors = [
+    {name = "Kevin Renskers", email = "kevin@loopwerk.io"},
+]
+license = "MIT"
+license-files = [ "LICENSE" ]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "django>=3.2.0",
+]
+keywords = [
+  "django",
+  "notifications",
+  "email",
+  "digest",
+  "multi-channel",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.15.0",
+    "pytest>=8.3.5",
+    "pytest-django>=4.10.0",
+    "ruff>=0.11.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/loopwerk/django-generic-notifications/"
+Repository = "https://github.com/loopwerk/django-generic-notifications.git"
+Issues = "https://github.com/loopwerk/django-generic-notifications/issues"
+
+[build-system]
+requires = ["uv_build>=0.7.19,<0.8.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "generic_notifications"
+module-root = ""
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 120
+lint.extend-select = ["I", "N"]
+
+[tool.mypy]
+disable_error_code = ["import-untyped"]
+warn_redundant_casts = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+python_files = "test*.py"
+filterwarnings = ["ignore::DeprecationWarning"]

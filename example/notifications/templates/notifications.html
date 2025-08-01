@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+  Notifications
+{% endblock title %}
+
+{% block body %}
+  <div class="mb-8">
+    <h1 class="text-xl">Notifications</h1>
+  </div>
+
+  <div id="notifications">
+    <div class="flex items-center justify-between mb-6">
+      <div class="tabs tabs-boxed">
+        <a href="{% url 'notifications' %}" role="tab" class="tab {% if not archive %}tab-active{% endif %}">Unread</a>
+        <a href="{% url 'notifications-archive' %}" role="tab" class="tab {% if archive %}tab-active{% endif %}">Archive</a>
+      </div>
+
+      <div class="flex gap-2">
+        {% if not archive and notifications %}
+          <form method="post" class="inline">
+            {% csrf_token %}
+            <button class="btn btn-accent">Mark all as read</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if notifications %}
+      <div class="overflow-x-auto">
+        <table class="table table-zebra">
+          <tbody>
+            {% for notification in notifications %}
+              <tr>
+                <td>
+                  <p class="{% if not notification.is_read %}font-semibold{% endif %}">
+                    {% if notification.url %}
+                      <a href="{{ notification.url }}" class="hover:underline">{{ notification.get_text }}</a>
+                    {% elif notification.target.get_absolute_url %}
+                      <a href="{{ notification.target.get_absolute_url }}" class="hover:underline">{{ notification.get_text }}</a>
+                    {% else %}
+                      {{ notification.get_text }}
+                    {% endif %}
+                  </p>
+                </td>
+                <td class="w-[200px] text-right">{{ notification.added|date:"M d, Y H:i" }}</td>
+                <td class="w-[200px] text-right">
+                  <form method="post" class="inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="id" value="{{ notification.id }}" />
+                    {% if archive %}
+                      <button class="btn btn-ghost btn-sm">Mark as unread</button>
+                    {% else %}
+                      <button class="btn btn-ghost btn-sm">Mark as read</button>
+                    {% endif %}
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center py-12">
+        <p class="text-lg text-base-content/60">
+          {% if archive %}
+            No archived notifications
+          {% else %}
+            No unread notifications
+          {% endif %}
+        </p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock body %}

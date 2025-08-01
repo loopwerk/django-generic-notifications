@@ -1,0 +1,8 @@
+{
+  "[html]": {
+    "editor.defaultFormatter": "monosans.djlint",
+    "editor.indentSize": 2
+  },
+  "djlint.profile": "django",
+  "djlint.enableLinting": false
+}

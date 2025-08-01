@@ -1,0 +1,34 @@
+[project]
+name = "django-generic-notifications-example"
+version = "1.0.0"
+description = "Example app for django-generic-notifications"
+requires-python = ">=3.10"
+dependencies = [
+    "django>=5.0",
+    "django-generic-notifications",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+django-generic-notifications = { path = "../" }
+
+[dependency-groups]
+dev = [
+    "djlint>=1.36.4",
+    "ruff>=0.11.7",
+]
+
+[tool.ruff]
+line-length = 120
+lint.extend-select = ["I", "N"]
+
+[tool.djlint]
+profile = "django"
+max_attribute_length = 140
+max_blank_lines = 1
+max_line_length = 140
+indent = 2
+custom_blocks = "partialdef,slot,element,setvar"
+ignore="H006,H021,H030,H031"
