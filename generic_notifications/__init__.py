@@ -1,6 +1,8 @@
 import logging
 from typing import TYPE_CHECKING, Any
 
+from django.db import transaction
+
 if TYPE_CHECKING:
     from .types import NotificationType
 
@@ -52,7 +54,7 @@ def send_notification(recipient: Any, notification_type: "type[NotificationType]
         return None
 
     # Create the notification record with enabled channels
-    notification = Notification.objects.create(
+    notification = Notification(
         recipient=recipient,
         notification_type=notification_type.key,
         actor=actor,
@@ -61,13 +63,20 @@ def send_notification(recipient: Any, notification_type: "type[NotificationType]
         **kwargs,
     )
 
-    # Process through enabled channels only
-    for channel_instance in enabled_channel_instances:
-        try:
-            channel_instance.process(notification)
-        except Exception as e:
-            # Log error but don't crash - other channels should still work
-            logger = logging.getLogger(__name__)
-            logger.error(f"Channel {channel_instance.key} failed to process notification {notification.id}: {e}")
+    # Use transaction to ensure atomicity when checking/updating existing notifications
+    with transaction.atomic():
+        if notification_type.should_save(notification):
+            notification.save()
 
-    return notification
+            # Process through enabled channels only
+            for channel_instance in enabled_channel_instances:
+                try:
+                    channel_instance.process(notification)
+                except Exception as e:
+                    # Log error but don't crash - other channels should still work
+                    logger = logging.getLogger(__name__)
+                    logger.error(
+                        f"Channel {channel_instance.key} failed to process notification {notification.id}: {e}"
+                    )
+
+            return notification

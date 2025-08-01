@@ -23,6 +23,19 @@ class NotificationType(ABC):
     def __str__(self) -> str:
         return self.name
 
+    @classmethod
+    def should_save(cls, notification: "Notification") -> bool:
+        """
+        A hook to prevent the saving of a new notification. You can use
+        this hook to find similar (unread) notifications and then instead
+        of creating this new notification, update the existing notification
+        with a `count` property (stored in the `metadata` field).
+        The `get_subject` or `get_text` methods can then use this `count`
+        to dynamically change the text from "you received a comment" to
+        "you received two comments", for example.
+        """
+        return True
+
     def get_subject(self, notification: "Notification") -> str:
         """
         Generate dynamic subject based on notification data.

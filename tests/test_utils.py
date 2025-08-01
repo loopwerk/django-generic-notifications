@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
@@ -25,6 +27,33 @@ class OtherNotificationType(NotificationType):
     key = "other_type"
     name = "Other Type"
     description = ""
+
+
+class GroupingNotificationType(NotificationType):
+    key = "grouping_type"
+    name = "Grouping Type"
+    description = "Notification that supports grouping"
+
+    @classmethod
+    def should_save(cls, notification):
+        # Look for existing unread notification with same actor and target
+        existing = Notification.objects.filter(
+            recipient=notification.recipient,
+            notification_type=notification.notification_type,
+            actor=notification.actor,
+            content_type_id=notification.content_type_id,
+            object_id=notification.object_id,
+            read__isnull=True,
+        ).first()
+
+        if existing:
+            # Update count in metadata
+            count = existing.metadata.get("count", 1)
+            existing.metadata["count"] = count + 1
+            existing.save()
+            return False
+
+        return True
 
 
 class SendNotificationTest(TestCase):
@@ -263,3 +292,155 @@ class GetNotificationsForUserTest(TestCase):
         notifications = get_notifications(self.user, channel=WebsiteChannel)
 
         self.assertEqual(notifications.count(), 3)  # Only this user's notifications
+
+
+class NotificationGroupingTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="test", email="test@example.com", password="testpass")
+        self.actor = User.objects.create_user(username="actor", email="actor@example.com", password="testpass")
+        self.target = User.objects.create_user(username="target", email="target@example.com", password="testpass")
+
+        # Register the grouping notification type
+        registry.register_type(GroupingNotificationType)
+
+    def test_should_save_grouping_behavior(self):
+        # First notification should be created
+        notification1 = send_notification(
+            recipient=self.user,
+            notification_type=GroupingNotificationType,
+            actor=self.actor,
+            target=self.target,
+            text="First comment",
+        )
+
+        self.assertIsNotNone(notification1)
+
+        # Second notification should be grouped
+        notification2 = send_notification(
+            recipient=self.user,
+            notification_type=GroupingNotificationType,
+            actor=self.actor,
+            target=self.target,
+            text="Second comment",
+        )
+
+        # No new notification created
+        self.assertIsNone(notification2)
+
+        # Original notification should be updated
+        notification1.refresh_from_db()
+        self.assertEqual(notification1.metadata["count"], 2)
+
+        # Still only one notification in database
+        self.assertEqual(Notification.objects.filter(recipient=self.user, notification_type="grouping_type").count(), 1)
+
+    def test_grouping_with_different_actors(self):
+        actor2 = User.objects.create_user(username="actor2", email="actor2@example.com", password="testpass")
+
+        # First notification
+        notification1 = send_notification(
+            recipient=self.user,
+            notification_type=GroupingNotificationType,
+            actor=self.actor,
+            target=self.target,
+        )
+
+        # Different actor - should create new notification
+        notification2 = send_notification(
+            recipient=self.user,
+            notification_type=GroupingNotificationType,
+            actor=actor2,
+            target=self.target,
+        )
+
+        self.assertIsNotNone(notification1)
+        self.assertIsNotNone(notification2)
+        self.assertNotEqual(notification1.id, notification2.id)
+        self.assertEqual(Notification.objects.filter(recipient=self.user, notification_type="grouping_type").count(), 2)
+
+    def test_grouping_with_different_targets(self):
+        target2 = User.objects.create_user(username="target2", email="target2@example.com", password="testpass")
+
+        # First notification
+        notification1 = send_notification(
+            recipient=self.user,
+            notification_type=GroupingNotificationType,
+            actor=self.actor,
+            target=self.target,
+        )
+
+        # Different target - should create new notification
+        notification2 = send_notification(
+            recipient=self.user,
+            notification_type=GroupingNotificationType,
+            actor=self.actor,
+            target=target2,
+        )
+
+        self.assertIsNotNone(notification1)
+        self.assertIsNotNone(notification2)
+        self.assertNotEqual(notification1.id, notification2.id)
+        self.assertEqual(Notification.objects.filter(recipient=self.user, notification_type="grouping_type").count(), 2)
+
+    def test_grouping_ignores_read_notifications(self):
+        # First notification
+        notification1 = send_notification(
+            recipient=self.user,
+            notification_type=GroupingNotificationType,
+            actor=self.actor,
+            target=self.target,
+        )
+
+        # Mark it as read
+        notification1.mark_as_read()
+
+        # Second notification should create new one (not group with read notification)
+        notification2 = send_notification(
+            recipient=self.user,
+            notification_type=GroupingNotificationType,
+            actor=self.actor,
+            target=self.target,
+        )
+
+        self.assertIsNotNone(notification1)
+        self.assertIsNotNone(notification2)
+        self.assertNotEqual(notification1.id, notification2.id)
+
+    def test_grouping_updates_metadata_multiple_times(self):
+        # Create first notification
+        notification1 = send_notification(
+            recipient=self.user,
+            notification_type=GroupingNotificationType,
+            actor=self.actor,
+            target=self.target,
+        )
+
+        # Send 3 more notifications
+        for i in range(3):
+            result = send_notification(
+                recipient=self.user,
+                notification_type=GroupingNotificationType,
+                actor=self.actor,
+                target=self.target,
+            )
+            self.assertIsNone(result)
+
+        # Check count was incremented correctly
+        notification1.refresh_from_db()
+        self.assertEqual(notification1.metadata["count"], 4)
+
+    @patch("generic_notifications.types.NotificationType.should_save")
+    def test_transaction_atomicity(self, mock_should_save):
+        # Simulate should_save raising an exception
+        mock_should_save.side_effect = Exception("Database error")
+
+        with self.assertRaises(Exception):
+            send_notification(
+                recipient=self.user,
+                notification_type=TestNotificationType,
+                actor=self.actor,
+                target=self.target,
+            )
+
+        # No notification should be created due to transaction rollback
+        self.assertEqual(Notification.objects.filter(recipient=self.user).count(), 0)
