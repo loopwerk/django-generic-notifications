@@ -65,7 +65,7 @@ class CommentNotification(NotificationType):
 from generic_notifications import send_notification
 from myapp.notifications import CommentNotification
 
-# Send a notification
+# Send a notification (only `recipient` and `notification_type` are required)
 notification = send_notification(
     recipient=post.author,
     notification_type=CommentNotification,
