@@ -1,5 +1,3 @@
-from typing import TYPE_CHECKING
-
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -10,9 +8,6 @@ from django.utils import timezone
 
 from .channels import NotificationChannel, WebsiteChannel
 from .registry import registry
-
-if TYPE_CHECKING:
-    pass
 
 User = get_user_model()
 
