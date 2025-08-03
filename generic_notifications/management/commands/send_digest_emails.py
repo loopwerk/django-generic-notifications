@@ -120,7 +120,7 @@ class Command(BaseCommand):
     def get_notification_types_for_frequency(
         self,
         user: AbstractUser,
-        frequency: type[NotificationFrequency],
+        wanted_frequency: type[NotificationFrequency],
         all_notification_types: list[type["NotificationType"]],
     ) -> list[type["NotificationType"]]:
         """
@@ -130,7 +130,7 @@ class Command(BaseCommand):
 
         Args:
             user: The user to check preferences for
-            frequency: The frequency to filter by (e.g. DailyFrequency, RealtimeFrequency)
+            wanted_frequency: The frequency to filter by (e.g. DailyFrequency, RealtimeFrequency)
             all_notification_types: List of all registered notification type classes
 
         Returns:
@@ -139,9 +139,8 @@ class Command(BaseCommand):
         relevant_types: list[type["NotificationType"]] = []
 
         for notification_type in all_notification_types:
-            # Use EmailFrequency's get_frequency method to get the frequency for this user/type
             user_frequency = notification_type.get_email_frequency(user)
-            if user_frequency.key == frequency.key:
+            if user_frequency.key == wanted_frequency.key:
                 relevant_types.append(notification_type)
 
         return relevant_types
