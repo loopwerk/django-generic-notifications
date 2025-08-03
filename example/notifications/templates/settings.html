@@ -38,7 +38,7 @@
                 <td class="text-center">
                   {% with channel_data=type_data.channels|dict_get:channel_key %}
                     <input type="checkbox"
-                           name="{{ type_data.notification_type.key }}_{{ channel_key }}"
+                           name="{{ type_data.notification_type.key }}__{{ channel_key }}"
                            class="checkbox checkbox-primary"
                            {% if channel_data.enabled %}checked{% endif %}
                            {% if channel_data.required %}disabled{% endif %}
@@ -51,7 +51,7 @@
               <!-- Email Frequency Select -->
               {% if "email" in channels %}
                 <td class="text-center">
-                  <select name="{{ type_data.notification_type.key }}_frequency"
+                  <select name="{{ type_data.notification_type.key }}__frequency"
                           class="select select-bordered select-sm"
                           :disabled="!emailEnabled"
                           :class="{ 'opacity-50': !emailEnabled }">
