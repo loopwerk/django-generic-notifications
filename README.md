@@ -86,9 +86,11 @@ By default every user gets notifications of all registered types delivered to ev
 
 All notification types default to daily digest, except for `SystemMessage` which defaults to real-time. Users can choose  different frequency per notification type.
 
+This project doesn't come with a UI (view + template) for managing user preferences, but an example is provided in the [example app](#example-app).
+
 ### Using the preference helpers
 
-The library provides helper functions to simplify building preference management UIs:
+The library does provide helper functions to simplify building preference management UIs:
 
 ```python
 from generic_notifications.preferences import (
@@ -121,8 +123,6 @@ CommentNotification.disable_channel(user=user, channel=EmailChannel)
 # Change to realtime digest for a notification type
 CommentNotification.set_email_frequency(user=user, frequency=RealtimeFrequency)
 ```
-
-This project doesn't come with a UI (view + template) for managing user preferences, but an example is provided in the [example app](#example-app).
 
 ## Custom Channels
 
