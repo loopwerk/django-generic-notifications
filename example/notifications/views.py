@@ -4,6 +4,7 @@ from django.template.response import TemplateResponse
 from django.views.generic import View
 from generic_notifications import send_notification
 from generic_notifications.preferences import get_notification_preferences, save_notification_preferences
+from generic_notifications.registry import registry
 from generic_notifications.utils import get_notifications, mark_notifications_as_read
 
 from .types import CommentNotificationType
@@ -67,12 +68,7 @@ class NotificationsArchiveView(LoginRequiredMixin, View):
 
 class NotificationSettingsView(LoginRequiredMixin, View):
     def get(self, request):
-        # Get user's notification preferences using the helper
         settings_data = get_notification_preferences(request.user)
-
-        # Get available channels and frequencies for the template
-        from generic_notifications.registry import registry
-
         channels = {ch.key: ch for ch in registry.get_all_channels()}
         frequencies = {freq.key: freq for freq in registry.get_all_frequencies()}
 
@@ -84,6 +80,5 @@ class NotificationSettingsView(LoginRequiredMixin, View):
         return TemplateResponse(request, "settings.html", context=context)
 
     def post(self, request):
-        # Save preferences using the helper
         save_notification_preferences(request.user, request.POST)
         return redirect("notification-settings")
