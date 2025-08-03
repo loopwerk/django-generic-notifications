@@ -65,14 +65,14 @@ wheels = [
 
 [[package]]
 name = "django-generic-notifications"
-version = "1.0.0"
+version = "1.1.0"
 source = { directory = "../" }
 dependencies = [
     { name = "django" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "django", specifier = ">=3.2.0" }]
+requires-dist = [{ name = "django", specifier = ">=4.2.0" }]
 
 [package.metadata.requires-dev]
 dev = [
