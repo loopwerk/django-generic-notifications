@@ -102,7 +102,7 @@ DisabledNotificationTypeChannel.objects.create(
 # Change to realtime digest for a notification type
 EmailFrequency.objects.update_or_create(
     user=user,
-    notification_type="comment",
+    notification_type=CommentNotification.key,
     defaults={'frequency': RealtimeFrequency.key}
 )
 ```
