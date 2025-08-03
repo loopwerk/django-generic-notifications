@@ -3,7 +3,7 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from generic_notifications.channels import EmailChannel, WebsiteChannel
+from generic_notifications.channels import WebsiteChannel
 from generic_notifications.frequencies import DailyFrequency, RealtimeFrequency
 from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency
 from generic_notifications.preferences import (
@@ -40,15 +40,7 @@ class GetNotificationPreferencesTest(TestCase):
         super().setUpClass()
         cls.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass")
 
-        # Register channels
-        registry.register_channel(WebsiteChannel, force=True)
-        registry.register_channel(EmailChannel, force=True)
-
-        # Register frequencies
-        registry.register_frequency(RealtimeFrequency, force=True)
-        registry.register_frequency(DailyFrequency, force=True)
-
-        # Register notification types
+        # Register custom notification types
         registry.register_type(TestNotificationType, force=True)
         registry.register_type(RequiredChannelNotificationType, force=True)
 
@@ -108,15 +100,7 @@ class SaveNotificationPreferencesTest(TestCase):
         cls.user = User.objects.create_user(username="testuser2", email="test2@example.com", password="testpass")
         cls.other_user = User.objects.create_user(username="otheruser", email="other@example.com", password="testpass")
 
-        # Register channels
-        registry.register_channel(WebsiteChannel, force=True)
-        registry.register_channel(EmailChannel, force=True)
-
-        # Register frequencies
-        registry.register_frequency(RealtimeFrequency, force=True)
-        registry.register_frequency(DailyFrequency, force=True)
-
-        # Register notification types
+        # Register custom notification types
         registry.register_type(TestNotificationType, force=True)
         registry.register_type(RequiredChannelNotificationType, force=True)
 
