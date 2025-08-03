@@ -1,4 +1,7 @@
+from typing import TYPE_CHECKING, Union
+
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.indexes import GinIndex
@@ -8,6 +11,10 @@ from django.utils import timezone
 
 from .channels import NotificationChannel, WebsiteChannel
 from .registry import registry
+
+if TYPE_CHECKING:
+    from .frequencies import NotificationFrequency
+    from .types import NotificationType
 
 User = get_user_model()
 
@@ -74,6 +81,66 @@ class DisabledNotificationTypeChannel(models.Model):
     def __str__(self) -> str:
         return f"{self.user} disabled {self.notification_type} on {self.channel}"
 
+    @classmethod
+    def disable_channel(
+        cls,
+        user: AbstractUser,
+        notification_type: Union["type[NotificationType]", "NotificationType"],
+        channel: Union["type[NotificationChannel]", "NotificationChannel"],
+    ):
+        """
+        Disable a notification type/channel combination for a user.
+
+        Args:
+            user: The user to disable notifications for
+            notification_type: NotificationType instance
+            channel: NotificationChannel instance
+
+        Returns:
+            The created DisabledNotificationTypeChannel instance
+        """
+        cls.objects.get_or_create(user=user, notification_type=notification_type.key, channel=channel.key)
+
+    @classmethod
+    def enable_channel(
+        cls,
+        user: AbstractUser,
+        notification_type: Union["type[NotificationType]", "NotificationType"],
+        channel: Union["type[NotificationChannel]", "NotificationChannel"],
+    ):
+        """
+        Enable a notification type/channel combination for a user by removing the disabled entry.
+
+        Args:
+            user: The user to enable notifications for
+            notification_type: NotificationType instance
+            channel: NotificationChannel instance
+
+        Returns:
+            True if a disabled entry was removed, False if it was already enabled
+        """
+        cls.objects.filter(user=user, notification_type=notification_type.key, channel=channel.key).delete()
+
+    @classmethod
+    def is_channel_enabled(
+        cls,
+        user: AbstractUser,
+        notification_type: Union["type[NotificationType]", "NotificationType"],
+        channel: Union["type[NotificationChannel]", "NotificationChannel"],
+    ) -> bool:
+        """
+        Check if a notification type/channel combination is enabled for a user.
+
+        Args:
+            user: The user to check for
+            notification_type: NotificationType instance
+            channel: NotificationChannel instance
+
+        Returns:
+            True if enabled (no disabled entry exists), False if disabled
+        """
+        return not cls.objects.filter(user=user, notification_type=notification_type.key, channel=channel.key).exists()
+
 
 class EmailFrequency(models.Model):
     """
@@ -119,6 +186,58 @@ class EmailFrequency(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user} - {self.notification_type}: {self.frequency}"
+
+    @classmethod
+    def set_frequency(
+        cls,
+        user: AbstractUser,
+        notification_type: Union["type[NotificationType]", "NotificationType"],
+        frequency: Union["type[NotificationFrequency]", "NotificationFrequency"],
+    ):
+        """
+        Set the email frequency for a notification type for a user.
+
+        Args:
+            user: The user to set the frequency for
+            notification_type: NotificationType instance
+            frequency: NotificationFrequency instance
+        """
+        cls.objects.update_or_create(
+            user=user, notification_type=notification_type.key, defaults={"frequency": frequency.key}
+        )
+
+    @classmethod
+    def get_frequency(
+        cls, user: AbstractUser, notification_type: Union["type[NotificationType]", "NotificationType"]
+    ) -> "NotificationFrequency":
+        """
+        Get the email frequency for a notification type for a user.
+
+        Args:
+            user: The user to get the frequency for
+            notification_type: NotificationType instance
+
+        Returns:
+            The frequency key (defaults to notification_type.default_email_frequency.key if not set)
+        """
+        try:
+            frequency_obj = cls.objects.get(user=user, notification_type=notification_type.key)
+            return registry.get_frequency(frequency_obj.frequency)
+        except cls.DoesNotExist:
+            return notification_type.default_email_frequency()
+
+    @classmethod
+    def reset_to_default(
+        cls, user: AbstractUser, notification_type: Union["type[NotificationType]", "NotificationType"]
+    ):
+        """
+        Reset the email frequency to default for a notification type for a user.
+
+        Args:
+            user: The user to reset the frequency for
+            notification_type: NotificationType instance
+        """
+        cls.objects.filter(user=user, notification_type=notification_type.key).delete()
 
 
 class Notification(models.Model):
