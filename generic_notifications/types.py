@@ -97,6 +97,35 @@ class NotificationType(ABC):
         EmailFrequency.objects.filter(user=user, notification_type=cls.key).delete()
 
     @classmethod
+    def get_enabled_channels(cls, user: Any) -> list[Type[NotificationChannel]]:
+        """
+        Get all enabled channels for this notification type for a user.
+        This is more efficient than calling is_channel_enabled for each channel individually.
+
+        Args:
+            user: User instance
+
+        Returns:
+            List of enabled NotificationChannel classes
+        """
+        from .models import DisabledNotificationTypeChannel
+
+        # Get all disabled channel keys for this user/notification type in one query
+        disabled_channel_keys = set(
+            DisabledNotificationTypeChannel.objects.filter(user=user, notification_type=cls.key).values_list(
+                "channel", flat=True
+            )
+        )
+
+        # Filter out disabled channels
+        enabled_channels = []
+        for channel_cls in registry.get_all_channels():
+            if channel_cls.key not in disabled_channel_keys:
+                enabled_channels.append(channel_cls)
+
+        return enabled_channels
+
+    @classmethod
     def is_channel_enabled(cls, user: Any, channel: Type[NotificationChannel]) -> bool:
         """
         Check if a channel is enabled for this notification type for a user.

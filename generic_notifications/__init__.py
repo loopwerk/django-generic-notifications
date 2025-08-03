@@ -56,15 +56,10 @@ def send_notification(
             )
 
     # Determine which channels are enabled for this user/notification type
-    enabled_channels = []
-    enabled_channel_instances = []
-    for channel_cls in registry.get_all_channels():
-        if notification_type.is_channel_enabled(recipient, channel_cls):
-            enabled_channels.append(channel_cls.key)
-            enabled_channel_instances.append(channel_cls())
+    enabled_channel_classes = notification_type.get_enabled_channels(recipient)
 
     # Don't create notification if no channels are enabled
-    if not enabled_channels:
+    if not enabled_channel_classes:
         return None
 
     # Create the notification record with enabled channels
@@ -73,7 +68,7 @@ def send_notification(
         notification_type=notification_type.key,
         actor=actor,
         target=target,
-        channels=enabled_channels,
+        channels=[channel_cls.key for channel_cls in enabled_channel_classes],
         subject=subject,
         text=text,
         url=url,
@@ -87,6 +82,7 @@ def send_notification(
             notification.save()
 
             # Process through enabled channels only
+            enabled_channel_instances = [channel_cls() for channel_cls in enabled_channel_classes]
             for channel_instance in enabled_channel_instances:
                 try:
                     channel_instance.process(notification)

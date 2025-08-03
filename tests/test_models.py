@@ -165,6 +165,36 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
         other_user = User.objects.create_user(username="other", email="other@example.com", password="pass")
         self.assertTrue(TestNotificationType.is_channel_enabled(other_user, WebsiteChannel))
 
+    def test_get_enabled_channels(self):
+        """Test the get_enabled_channels optimization method"""
+        # By default, all channels should be enabled
+        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
+        enabled_channel_keys = [ch.key for ch in enabled_channels]
+
+        self.assertIn("website", enabled_channel_keys)
+        self.assertIn("email", enabled_channel_keys)
+        self.assertEqual(len(enabled_channels), 2)
+
+        # Disable website channel
+        DisabledNotificationTypeChannel.objects.create(user=self.user, notification_type="test_type", channel="website")
+
+        # Should now only return email channel
+        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
+        enabled_channel_keys = [ch.key for ch in enabled_channels]
+
+        self.assertNotIn("website", enabled_channel_keys)
+        self.assertIn("email", enabled_channel_keys)
+        self.assertEqual(len(enabled_channels), 1)
+
+        # Different user should not be affected
+        other_user = User.objects.create_user(username="other2", email="other2@example.com", password="pass")
+        other_enabled_channels = TestNotificationType.get_enabled_channels(other_user)
+        other_enabled_channel_keys = [ch.key for ch in other_enabled_channels]
+
+        self.assertIn("website", other_enabled_channel_keys)
+        self.assertIn("email", other_enabled_channel_keys)
+        self.assertEqual(len(other_enabled_channels), 2)
+
 
 class EmailFrequencyModelTest(TestCase):
     user: Any  # User model instance created in setUpClass
