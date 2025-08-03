@@ -116,10 +116,10 @@ from generic_notifications.frequencies import RealtimeFrequency
 from myapp.notifications import CommentNotification
 
 # Disable email channel for comment notifications
-DisabledNotificationTypeChannel.disable_channel(user=user, notification_type=CommentNotification, channel=EmailChannel)
+EmailChannel.disable(user=user, notification_type=CommentNotification)
 
 # Change to realtime digest for a notification type
-EmailFrequency.set_frequency(user=user, notification_type=CommentNotification, frequency=RealtimeFrequency)
+CommentNotification.set_email_frequency(user=user, frequency=RealtimeFrequency)
 ```
 
 This project doesn't come with a UI (view + template) for managing user preferences, but an example is provided in the [example app](#example-app).

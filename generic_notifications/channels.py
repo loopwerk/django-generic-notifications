@@ -37,22 +37,50 @@ class NotificationChannel(ABC):
     @classmethod
     def is_enabled(cls, user: Any, notification_type: "type[NotificationType]") -> bool:
         """
-        Check if user has this channel enabled for this notification type.
+        Check if this channel is enabled for a user and notification type.
 
         Args:
             user: User instance
-            notification_type: Notification type
+            notification_type: NotificationType class
 
         Returns:
-            bool: True if enabled (default), False if disabled
+            True if channel is enabled, False if disabled
         """
         from .models import DisabledNotificationTypeChannel
 
-        return DisabledNotificationTypeChannel.is_channel_enabled(
-            user=user,
-            notification_type=notification_type,
-            channel=cls,
+        return not DisabledNotificationTypeChannel.objects.filter(
+            user=user, notification_type=notification_type.key, channel=cls.key
+        ).exists()
+
+    @classmethod
+    def disable(cls, user: Any, notification_type: "type[NotificationType]") -> None:
+        """
+        Disable this channel for a user and notification type.
+
+        Args:
+            user: User instance
+            notification_type: NotificationType class
+        """
+        from .models import DisabledNotificationTypeChannel
+
+        DisabledNotificationTypeChannel.objects.get_or_create(
+            user=user, notification_type=notification_type.key, channel=cls.key
         )
+
+    @classmethod
+    def enable(cls, user: Any, notification_type: "type[NotificationType]") -> None:
+        """
+        Enable this channel for a user and notification type.
+
+        Args:
+            user: User instance
+            notification_type: NotificationType class
+        """
+        from .models import DisabledNotificationTypeChannel
+
+        DisabledNotificationTypeChannel.objects.filter(
+            user=user, notification_type=notification_type.key, channel=cls.key
+        ).delete()
 
 
 def register(cls: Type[NotificationChannel]) -> Type[NotificationChannel]:
@@ -110,11 +138,9 @@ class EmailChannel(NotificationChannel):
         Args:
             notification: Notification instance to process
         """
-        from .models import EmailFrequency
-
         # Get notification type class from key
         notification_type_cls = registry.get_type(notification.notification_type)
-        frequency_cls = EmailFrequency.get_frequency(notification.recipient, notification_type_cls)
+        frequency_cls = notification_type_cls.get_email_frequency(notification.recipient)
 
         # Send immediately if realtime, otherwise leave for digest
         if frequency_cls and frequency_cls.is_realtime:

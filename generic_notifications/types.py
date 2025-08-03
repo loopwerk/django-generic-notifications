@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Any, Type
 
 from .channels import EmailChannel, NotificationChannel
 from .frequencies import DailyFrequency, NotificationFrequency, RealtimeFrequency
@@ -49,6 +49,52 @@ class NotificationType(ABC):
         Override this in subclasses for custom behavior.
         """
         return ""
+
+    @classmethod
+    def set_email_frequency(cls, user: Any, frequency: Type[NotificationFrequency]) -> None:
+        """
+        Set the email frequency for this notification type for a user.
+
+        Args:
+            user: The user to set the frequency for
+            frequency: NotificationFrequency class
+        """
+        from .models import EmailFrequency
+
+        EmailFrequency.objects.update_or_create(
+            user=user, notification_type=cls.key, defaults={"frequency": frequency.key}
+        )
+
+    @classmethod
+    def get_email_frequency(cls, user: Any) -> Type[NotificationFrequency]:
+        """
+        Get the email frequency for this notification type for a user.
+
+        Args:
+            user: The user to get the frequency for
+
+        Returns:
+            NotificationFrequency class (either user preference or default)
+        """
+        from .models import EmailFrequency
+
+        try:
+            user_frequency = EmailFrequency.objects.get(user=user, notification_type=cls.key)
+            return registry.get_frequency(user_frequency.frequency)
+        except EmailFrequency.DoesNotExist:
+            return cls.default_email_frequency
+
+    @classmethod
+    def reset_email_frequency_to_default(cls, user: Any) -> None:
+        """
+        Reset the email frequency to default for this notification type for a user.
+
+        Args:
+            user: The user to reset the frequency for
+        """
+        from .models import EmailFrequency
+
+        EmailFrequency.objects.filter(user=user, notification_type=cls.key).delete()
 
 
 def register(cls: Type[NotificationType]) -> Type[NotificationType]:

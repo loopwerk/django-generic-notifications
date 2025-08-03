@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 
 from generic_notifications.channels import EmailChannel
 from generic_notifications.frequencies import NotificationFrequency
-from generic_notifications.models import EmailFrequency, Notification
+from generic_notifications.models import Notification
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
 
@@ -140,7 +140,7 @@ class Command(BaseCommand):
 
         for notification_type in all_notification_types:
             # Use EmailFrequency's get_frequency method to get the frequency for this user/type
-            user_frequency = EmailFrequency.get_frequency(user, notification_type)
+            user_frequency = notification_type.get_email_frequency(user)
             if user_frequency.key == frequency.key:
                 relevant_types.append(notification_type)
 
