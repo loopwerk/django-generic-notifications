@@ -8,10 +8,10 @@ from django.test import TestCase
 from django.utils import timezone
 
 from generic_notifications.channels import EmailChannel, WebsiteChannel
-from generic_notifications.frequencies import DailyFrequency, RealtimeFrequency
+from generic_notifications.frequencies import DailyFrequency
 from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency, Notification
 from generic_notifications.registry import registry
-from generic_notifications.types import NotificationType
+from generic_notifications.types import NotificationType, SystemMessage
 
 User = get_user_model()
 
@@ -49,15 +49,17 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
 
     def test_create_disabled_notification(self):
         disabled = DisabledNotificationTypeChannel.objects.create(
-            user=self.user, notification_type="test_type", channel="website"
+            user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
         )
 
         self.assertEqual(disabled.user, self.user)
-        self.assertEqual(disabled.notification_type, "test_type")
-        self.assertEqual(disabled.channel, "website")
+        self.assertEqual(disabled.notification_type, TestNotificationType.key)
+        self.assertEqual(disabled.channel, WebsiteChannel.key)
 
     def test_clean_with_invalid_notification_type(self):
-        disabled = DisabledNotificationTypeChannel(user=self.user, notification_type="invalid_type", channel="website")
+        disabled = DisabledNotificationTypeChannel(
+            user=self.user, notification_type="invalid_type", channel=WebsiteChannel.key
+        )
 
         with self.assertRaises(ValidationError) as cm:
             disabled.clean()
@@ -66,7 +68,7 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
 
     def test_clean_with_invalid_channel(self):
         disabled = DisabledNotificationTypeChannel(
-            user=self.user, notification_type="test_type", channel="invalid_channel"
+            user=self.user, notification_type=TestNotificationType.key, channel="invalid_channel"
         )
 
         with self.assertRaises(ValidationError) as cm:
@@ -75,14 +77,18 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
         self.assertIn("Unknown channel: invalid_channel", str(cm.exception))
 
     def test_clean_with_valid_data(self):
-        disabled = DisabledNotificationTypeChannel(user=self.user, notification_type="test_type", channel="website")
+        disabled = DisabledNotificationTypeChannel(
+            user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
+        )
 
         # Should not raise any exception
         disabled.clean()
 
     def test_clean_prevents_disabling_required_channel(self):
         """Test that users cannot disable required channels for notification types"""
-        disabled = DisabledNotificationTypeChannel(user=self.user, notification_type="system_message", channel="email")
+        disabled = DisabledNotificationTypeChannel(
+            user=self.user, notification_type=SystemMessage.key, channel=EmailChannel.key
+        )
 
         with self.assertRaises(ValidationError) as cm:
             disabled.clean()
@@ -92,108 +98,11 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
     def test_clean_allows_disabling_non_required_channel(self):
         """Test that users can disable non-required channels for notification types with required channels"""
         disabled = DisabledNotificationTypeChannel(
-            user=self.user, notification_type="system_message", channel="website"
+            user=self.user, notification_type=SystemMessage.key, channel=WebsiteChannel.key
         )
 
         # Should not raise any exception - website is not required for system_message
         disabled.clean()
-
-    def test_disable_channel(self):
-        """Test the disable_channel class method"""
-        # Verify channel is enabled initially
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-
-        # Disable the channel
-        TestNotificationType.disable_channel(self.user, WebsiteChannel)
-
-        # Verify it was created
-        self.assertTrue(
-            DisabledNotificationTypeChannel.objects.filter(
-                user=self.user, notification_type="test_type", channel="website"
-            ).exists()
-        )
-
-        # Verify channel is now disabled
-        self.assertFalse(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-
-        # Disabling again should not create duplicate (get_or_create behavior)
-        TestNotificationType.disable_channel(self.user, WebsiteChannel)
-        self.assertEqual(
-            DisabledNotificationTypeChannel.objects.filter(
-                user=self.user, notification_type="test_type", channel="website"
-            ).count(),
-            1,
-        )
-
-    def test_enable_channel(self):
-        """Test the enable_channel class method"""
-        # First disable the channel
-        DisabledNotificationTypeChannel.objects.create(user=self.user, notification_type="test_type", channel="website")
-        self.assertFalse(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-
-        # Enable the channel
-        TestNotificationType.enable_channel(self.user, WebsiteChannel)
-
-        # Verify the disabled entry was removed
-        self.assertFalse(
-            DisabledNotificationTypeChannel.objects.filter(
-                user=self.user, notification_type="test_type", channel="website"
-            ).exists()
-        )
-
-        # Verify channel is now enabled
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-
-        # Enabling an already enabled channel should work without error
-        TestNotificationType.enable_channel(self.user, WebsiteChannel)
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-
-    def test_is_channel_enabled(self):
-        """Test the is_channel_enabled class method"""
-        # By default, all channels should be enabled
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, EmailChannel))
-
-        # Disable website channel
-        DisabledNotificationTypeChannel.objects.create(user=self.user, notification_type="test_type", channel="website")
-
-        # Website should be disabled, email should still be enabled
-        self.assertFalse(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, EmailChannel))
-
-        # Different user should not be affected
-        other_user = User.objects.create_user(username="other", email="other@example.com", password="pass")
-        self.assertTrue(TestNotificationType.is_channel_enabled(other_user, WebsiteChannel))
-
-    def test_get_enabled_channels(self):
-        """Test the get_enabled_channels optimization method"""
-        # By default, all channels should be enabled
-        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
-        enabled_channel_keys = [ch.key for ch in enabled_channels]
-
-        self.assertIn("website", enabled_channel_keys)
-        self.assertIn("email", enabled_channel_keys)
-        self.assertEqual(len(enabled_channels), 2)
-
-        # Disable website channel
-        DisabledNotificationTypeChannel.objects.create(user=self.user, notification_type="test_type", channel="website")
-
-        # Should now only return email channel
-        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
-        enabled_channel_keys = [ch.key for ch in enabled_channels]
-
-        self.assertNotIn("website", enabled_channel_keys)
-        self.assertIn("email", enabled_channel_keys)
-        self.assertEqual(len(enabled_channels), 1)
-
-        # Different user should not be affected
-        other_user = User.objects.create_user(username="other2", email="other2@example.com", password="pass")
-        other_enabled_channels = TestNotificationType.get_enabled_channels(other_user)
-        other_enabled_channel_keys = [ch.key for ch in other_enabled_channels]
-
-        self.assertIn("website", other_enabled_channel_keys)
-        self.assertIn("email", other_enabled_channel_keys)
-        self.assertEqual(len(other_enabled_channels), 2)
 
 
 class EmailFrequencyModelTest(TestCase):
@@ -210,20 +119,26 @@ class EmailFrequencyModelTest(TestCase):
         registry.register_frequency(DailyFrequency, force=True)
 
     def test_create_email_frequency(self):
-        frequency = EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        frequency = EmailFrequency.objects.create(
+            user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
+        )
 
         self.assertEqual(frequency.user, self.user)
-        self.assertEqual(frequency.notification_type, "test_type")
-        self.assertEqual(frequency.frequency, "daily")
+        self.assertEqual(frequency.notification_type, TestNotificationType.key)
+        self.assertEqual(frequency.frequency, DailyFrequency.key)
 
     def test_unique_together_constraint(self):
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        EmailFrequency.objects.create(
+            user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
+        )
 
         with self.assertRaises(IntegrityError):
-            EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+            EmailFrequency.objects.create(
+                user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
+            )
 
     def test_clean_with_invalid_notification_type(self):
-        frequency = EmailFrequency(user=self.user, notification_type="invalid_type", frequency="daily")
+        frequency = EmailFrequency(user=self.user, notification_type="invalid_type", frequency=DailyFrequency.key)
 
         with self.assertRaises(ValidationError) as cm:
             frequency.clean()
@@ -231,7 +146,9 @@ class EmailFrequencyModelTest(TestCase):
         self.assertIn("Unknown notification type: invalid_type", str(cm.exception))
 
     def test_clean_with_invalid_frequency(self):
-        frequency = EmailFrequency(user=self.user, notification_type="test_type", frequency="invalid_frequency")
+        frequency = EmailFrequency(
+            user=self.user, notification_type=TestNotificationType.key, frequency="invalid_frequency"
+        )
 
         with self.assertRaises(ValidationError) as cm:
             frequency.clean()
@@ -239,75 +156,12 @@ class EmailFrequencyModelTest(TestCase):
         self.assertIn("Unknown frequency: invalid_frequency", str(cm.exception))
 
     def test_clean_with_valid_data(self):
-        frequency = EmailFrequency(user=self.user, notification_type="test_type", frequency="daily")
+        frequency = EmailFrequency(
+            user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
+        )
 
         # Should not raise any exception
         frequency.clean()
-
-    def test_set_frequency(self):
-        # Set frequency for the first time
-        TestNotificationType.set_email_frequency(self.user, DailyFrequency)
-
-        # Verify it was created
-        freq = EmailFrequency.objects.get(user=self.user, notification_type="test_type")
-        self.assertEqual(freq.frequency, "daily")
-
-        # Update to a different frequency
-        registry.register_frequency(RealtimeFrequency, force=True)
-        TestNotificationType.set_email_frequency(self.user, RealtimeFrequency)
-
-        # Verify it was updated
-        freq.refresh_from_db()
-        self.assertEqual(freq.frequency, "realtime")
-
-        # Verify there's still only one record
-        self.assertEqual(EmailFrequency.objects.filter(user=self.user, notification_type="test_type").count(), 1)
-
-    def test_get_frequency_with_user_preference(self):
-        # Set user preference
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
-
-        # Get frequency should return the user's preference
-        frequency_cls = TestNotificationType.get_email_frequency(self.user)
-        self.assertEqual(frequency_cls.key, "daily")
-        self.assertEqual(frequency_cls, DailyFrequency)
-
-    def test_get_frequency_returns_default_when_no_preference(self):
-        # TestNotificationType has default_email_frequency = DailyFrequency
-        frequency_cls = TestNotificationType.get_email_frequency(self.user)
-        self.assertEqual(frequency_cls.key, "daily")
-        self.assertEqual(frequency_cls, DailyFrequency)
-
-    def test_get_frequency_with_custom_default(self):
-        # Create a notification type with a different default
-        registry.register_frequency(RealtimeFrequency, force=True)
-
-        class RealtimeNotificationType(NotificationType):
-            key = "realtime_type"
-            name = "Realtime Type"
-            default_email_frequency = RealtimeFrequency
-
-        registry.register_type(RealtimeNotificationType)
-
-        # Should return the custom default
-        frequency_cls = RealtimeNotificationType.get_email_frequency(self.user)
-        self.assertEqual(frequency_cls.key, "realtime")
-        self.assertEqual(frequency_cls, RealtimeFrequency)
-
-    def test_reset_to_default(self):
-        # First set a custom preference
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
-        self.assertTrue(EmailFrequency.objects.filter(user=self.user, notification_type="test_type").exists())
-
-        # Reset to default
-        TestNotificationType.reset_email_frequency_to_default(self.user)
-
-        # Verify the custom preference was removed
-        self.assertFalse(EmailFrequency.objects.filter(user=self.user, notification_type="test_type").exists())
-
-        # Getting frequency should now return the default
-        frequency_cls = TestNotificationType.get_email_frequency(self.user)
-        self.assertEqual(frequency_cls, TestNotificationType.default_email_frequency)
 
 
 class NotificationModelTest(TestCase):
@@ -325,11 +179,13 @@ class NotificationModelTest(TestCase):
 
     def test_create_minimal_notification(self):
         notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", channels=["website", "email"]
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key, EmailChannel.key],
         )
 
         self.assertEqual(notification.recipient, self.user)
-        self.assertEqual(notification.notification_type, "test_type")
+        self.assertEqual(notification.notification_type, TestNotificationType.key)
         self.assertIsNotNone(notification.added)
         self.assertIsNone(notification.read)
         self.assertEqual(notification.metadata, {})
@@ -337,7 +193,7 @@ class NotificationModelTest(TestCase):
     def test_create_full_notification(self):
         notification = Notification.objects.create(
             recipient=self.user,
-            notification_type="test_type",
+            notification_type=TestNotificationType.key,
             subject="Test Subject",
             text="Test notification text",
             url="/test/url",
@@ -346,7 +202,7 @@ class NotificationModelTest(TestCase):
         )
 
         self.assertEqual(notification.recipient, self.user)
-        self.assertEqual(notification.notification_type, "test_type")
+        self.assertEqual(notification.notification_type, TestNotificationType.key)
         self.assertEqual(notification.subject, "Test Subject")
         self.assertEqual(notification.text, "Test notification text")
         self.assertEqual(notification.url, "/test/url")
@@ -359,7 +215,10 @@ class NotificationModelTest(TestCase):
         content_type = ContentType.objects.get_for_model(User)
 
         notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", content_type=content_type, object_id=target_user.id
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            content_type=content_type,
+            object_id=target_user.id,
         )
 
         self.assertEqual(notification.target, target_user)
@@ -373,14 +232,16 @@ class NotificationModelTest(TestCase):
         self.assertIn("Unknown notification type: invalid_type", str(cm.exception))
 
     def test_clean_with_valid_notification_type(self):
-        notification = Notification(recipient=self.user, notification_type="test_type")
+        notification = Notification(recipient=self.user, notification_type=TestNotificationType.key)
 
         # Should not raise any exception
         notification.clean()
 
     def test_mark_as_read(self):
         notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", channels=["website", "email"]
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key, EmailChannel.key],
         )
 
         self.assertFalse(notification.is_read)
@@ -394,7 +255,9 @@ class NotificationModelTest(TestCase):
 
     def test_mark_as_read_idempotent(self):
         notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", channels=["website", "email"]
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key, EmailChannel.key],
         )
 
         # Mark as read first time
@@ -411,7 +274,9 @@ class NotificationModelTest(TestCase):
 
     def test_is_read_property(self):
         notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", channels=["website", "email"]
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key, EmailChannel.key],
         )
 
         self.assertFalse(notification.is_read)
@@ -421,7 +286,9 @@ class NotificationModelTest(TestCase):
 
     def test_email_sent_tracking(self):
         notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", channels=["website", "email"]
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key, EmailChannel.key],
         )
 
         self.assertIsNone(notification.email_sent_at)
