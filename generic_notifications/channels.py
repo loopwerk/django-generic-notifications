@@ -8,11 +8,12 @@ from django.db.models import QuerySet
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-from .frequencies import DailyFrequency, NotificationFrequency
+from .frequencies import NotificationFrequency
 from .registry import registry
 
 if TYPE_CHECKING:
     from .models import Notification
+    from .types import NotificationType
 
 
 class NotificationChannel(ABC):
@@ -33,22 +34,25 @@ class NotificationChannel(ABC):
         """
         pass
 
-    def is_enabled(self, user: Any, notification_type: str) -> bool:
+    @classmethod
+    def is_enabled(cls, user: Any, notification_type: "type[NotificationType]") -> bool:
         """
         Check if user has this channel enabled for this notification type.
 
         Args:
             user: User instance
-            notification_type: Notification type key
+            notification_type: Notification type
 
         Returns:
             bool: True if enabled (default), False if disabled
         """
         from .models import DisabledNotificationTypeChannel
 
-        return not DisabledNotificationTypeChannel.objects.filter(
-            user=user, notification_type=notification_type, channel=self.key
-        ).exists()
+        return DisabledNotificationTypeChannel.is_channel_enabled(
+            user=user,
+            notification_type=notification_type,
+            channel=cls,
+        )
 
 
 def register(cls: Type[NotificationChannel]) -> Type[NotificationChannel]:
@@ -106,36 +110,15 @@ class EmailChannel(NotificationChannel):
         Args:
             notification: Notification instance to process
         """
-        frequency = self.get_frequency(notification.recipient, notification.notification_type)
-
-        # Send immediately if realtime, otherwise leave for digest
-        if frequency and frequency.is_realtime:
-            self.send_email_now(notification)
-
-    def get_frequency(self, user: Any, notification_type: str) -> NotificationFrequency:
-        """
-        Get the user's email frequency preference for this notification type.
-
-        Args:
-            user: User instance
-            notification_type: Notification type key
-
-        Returns:
-            NotificationFrequency: NotificationFrequency instance (defaults to notification type's default)
-        """
         from .models import EmailFrequency
 
-        try:
-            email_frequency = EmailFrequency.objects.get(user=user, notification_type=notification_type)
-            return registry.get_frequency(email_frequency.frequency)
-        except (EmailFrequency.DoesNotExist, KeyError):
-            # Get the notification type's default frequency
-            try:
-                notification_type_obj = registry.get_type(notification_type)
-                return notification_type_obj.default_email_frequency()
-            except (KeyError, AttributeError):
-                # Fallback to realtime if notification type not found or no default
-                return DailyFrequency()
+        # Get notification type class from key
+        notification_type_cls = registry.get_type(notification.notification_type)
+        frequency_cls = EmailFrequency.get_frequency(notification.recipient, notification_type_cls)
+
+        # Send immediately if realtime, otherwise leave for digest
+        if frequency_cls and frequency_cls.is_realtime:
+            self.send_email_now(notification)
 
     def send_email_now(self, notification: "Notification") -> None:
         """
@@ -196,7 +179,7 @@ class EmailChannel(NotificationChannel):
 
     @classmethod
     def send_digest_emails(
-        cls, user: Any, notifications: "QuerySet[Notification]", frequency: NotificationFrequency | None = None
+        cls, user: Any, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
     ):
         """
         Send a digest email to a specific user with specific notifications.

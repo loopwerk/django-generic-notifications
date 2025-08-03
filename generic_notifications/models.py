@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
@@ -50,7 +50,7 @@ class DisabledNotificationTypeChannel(models.Model):
 
     def clean(self):
         try:
-            notification_type_obj = registry.get_type(self.notification_type)
+            notification_type_cls = registry.get_type(self.notification_type)
         except KeyError:
             available_types = [t.key for t in registry.get_all_types()]
             if available_types:
@@ -63,10 +63,10 @@ class DisabledNotificationTypeChannel(models.Model):
                 )
 
         # Check if trying to disable a required channel
-        required_channel_keys = [cls.key for cls in notification_type_obj.required_channels]
+        required_channel_keys = [cls.key for cls in notification_type_cls.required_channels]
         if self.channel in required_channel_keys:
             raise ValidationError(
-                f"Cannot disable {self.channel} channel for {notification_type_obj.name} - this channel is required"
+                f"Cannot disable {self.channel} channel for {notification_type_cls.name} - this channel is required"
             )
 
         try:
@@ -83,10 +83,7 @@ class DisabledNotificationTypeChannel(models.Model):
 
     @classmethod
     def disable_channel(
-        cls,
-        user: AbstractUser,
-        notification_type: Union["type[NotificationType]", "NotificationType"],
-        channel: Union["type[NotificationChannel]", "NotificationChannel"],
+        cls, user: AbstractUser, notification_type: "type[NotificationType]", channel: "type[NotificationChannel]"
     ):
         """
         Disable a notification type/channel combination for a user.
@@ -103,10 +100,7 @@ class DisabledNotificationTypeChannel(models.Model):
 
     @classmethod
     def enable_channel(
-        cls,
-        user: AbstractUser,
-        notification_type: Union["type[NotificationType]", "NotificationType"],
-        channel: Union["type[NotificationChannel]", "NotificationChannel"],
+        cls, user: AbstractUser, notification_type: "type[NotificationType]", channel: "type[NotificationChannel]"
     ):
         """
         Enable a notification type/channel combination for a user by removing the disabled entry.
@@ -123,10 +117,7 @@ class DisabledNotificationTypeChannel(models.Model):
 
     @classmethod
     def is_channel_enabled(
-        cls,
-        user: AbstractUser,
-        notification_type: Union["type[NotificationType]", "NotificationType"],
-        channel: Union["type[NotificationChannel]", "NotificationChannel"],
+        cls, user: AbstractUser, notification_type: "type[NotificationType]", channel: "type[NotificationChannel]"
     ) -> bool:
         """
         Check if a notification type/channel combination is enabled for a user.
@@ -189,10 +180,7 @@ class EmailFrequency(models.Model):
 
     @classmethod
     def set_frequency(
-        cls,
-        user: AbstractUser,
-        notification_type: Union["type[NotificationType]", "NotificationType"],
-        frequency: Union["type[NotificationFrequency]", "NotificationFrequency"],
+        cls, user: AbstractUser, notification_type: "type[NotificationType]", frequency: "type[NotificationFrequency]"
     ):
         """
         Set the email frequency for a notification type for a user.
@@ -208,8 +196,8 @@ class EmailFrequency(models.Model):
 
     @classmethod
     def get_frequency(
-        cls, user: AbstractUser, notification_type: Union["type[NotificationType]", "NotificationType"]
-    ) -> "NotificationFrequency":
+        cls, user: AbstractUser, notification_type: "type[NotificationType]"
+    ) -> "type[NotificationFrequency]":
         """
         Get the email frequency for a notification type for a user.
 
@@ -224,12 +212,10 @@ class EmailFrequency(models.Model):
             frequency_obj = cls.objects.get(user=user, notification_type=notification_type.key)
             return registry.get_frequency(frequency_obj.frequency)
         except cls.DoesNotExist:
-            return notification_type.default_email_frequency()
+            return notification_type.default_email_frequency
 
     @classmethod
-    def reset_to_default(
-        cls, user: AbstractUser, notification_type: Union["type[NotificationType]", "NotificationType"]
-    ):
+    def reset_to_default(cls, user: AbstractUser, notification_type: "type[NotificationType]"):
         """
         Reset the email frequency to default for a notification type for a user.
 
@@ -323,7 +309,8 @@ class Notification(models.Model):
 
         # Get the notification type and use its dynamic generation
         try:
-            notification_type = registry.get_type(self.notification_type)
+            notification_type_cls = registry.get_type(self.notification_type)
+            notification_type = notification_type_cls()
             return notification_type.get_subject(self) or notification_type.description
         except KeyError:
             return f"Notification: {self.notification_type}"
@@ -335,7 +322,8 @@ class Notification(models.Model):
 
         # Get the notification type and use its dynamic generation
         try:
-            notification_type = registry.get_type(self.notification_type)
+            notification_type_cls = registry.get_type(self.notification_type)
+            notification_type = notification_type_cls()
             return notification_type.get_text(self)
         except KeyError:
             return "You have a new notification"

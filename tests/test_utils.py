@@ -8,11 +8,7 @@ from generic_notifications.channels import WebsiteChannel
 from generic_notifications.models import Notification
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
-from generic_notifications.utils import (
-    get_notifications,
-    get_unread_count,
-    mark_notifications_as_read,
-)
+from generic_notifications.utils import get_notifications, get_unread_count, mark_notifications_as_read
 
 User = get_user_model()
 

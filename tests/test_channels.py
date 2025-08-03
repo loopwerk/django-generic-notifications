@@ -6,7 +6,7 @@ from django.core import mail
 from django.test import TestCase, override_settings
 
 from generic_notifications.channels import EmailChannel, NotificationChannel
-from generic_notifications.frequencies import DailyFrequency, RealtimeFrequency
+from generic_notifications.frequencies import RealtimeFrequency
 from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency, Notification
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
@@ -50,9 +50,8 @@ class NotificationChannelTest(TestCase):
             def process(self, notification):
                 pass
 
-        channel = TestChannel()
         # By default, all notifications are enabled
-        self.assertTrue(channel.is_enabled(self.user, "any_type"))
+        self.assertTrue(TestChannel.is_enabled(self.user, TestNotificationType))
 
     def test_is_enabled_with_disabled_notification(self):
         class TestChannel(NotificationChannel):
@@ -62,7 +61,13 @@ class NotificationChannelTest(TestCase):
             def process(self, notification):
                 pass
 
-        channel = TestChannel()
+        class DisabledNotificationType(NotificationType):
+            key = "disabled_type"
+            name = "Disabled Type"
+
+        class OtherNotificationType(NotificationType):
+            key = "other_type"
+            name = "Other Type"
 
         # Disable notification channel for this user
         DisabledNotificationTypeChannel.objects.create(
@@ -70,10 +75,10 @@ class NotificationChannelTest(TestCase):
         )
 
         # Should be disabled for this type
-        self.assertFalse(channel.is_enabled(self.user, "disabled_type"))
+        self.assertFalse(TestChannel.is_enabled(self.user, DisabledNotificationType))
 
         # But enabled for other types
-        self.assertTrue(channel.is_enabled(self.user, "other_type"))
+        self.assertTrue(TestChannel.is_enabled(self.user, OtherNotificationType))
 
 
 class WebsiteChannelTest(TestCase):
@@ -98,32 +103,6 @@ class EmailChannelTest(TestCase):
 
     def tearDown(self):
         mail.outbox.clear()
-
-    def test_get_frequency_with_user_preference(self):
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
-
-        channel = EmailChannel()
-        frequency = channel.get_frequency(self.user, "test_type")
-
-        self.assertEqual(frequency.key, "daily")
-
-    def test_get_frequency_default_realtime(self):
-        channel = EmailChannel()
-        frequency = channel.get_frequency(self.user, "test_type")
-
-        # Should default to first realtime frequency
-        self.assertEqual(frequency.key, "realtime")
-
-    def test_get_frequency_fallback_when_no_realtime(self):
-        # Clear realtime frequencies and add only non-realtime
-        registry.unregister_frequency(RealtimeFrequency)
-        registry.register_frequency(DailyFrequency)
-
-        channel = EmailChannel()
-        frequency = channel.get_frequency(self.user, "test_type")
-
-        # Should fallback to "realtime" string
-        self.assertEqual(frequency.key, "realtime")
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_process_realtime_frequency(self):
