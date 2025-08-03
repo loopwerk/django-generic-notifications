@@ -1,10 +1,9 @@
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import Any, Dict, List
+
+from django.contrib.auth.models import AbstractUser
 
 from .models import DisabledNotificationTypeChannel, EmailFrequency
 from .registry import registry
-
-if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractUser
 
 
 def get_notification_preferences(user: "AbstractUser") -> List[Dict[str, Any]]:

@@ -167,14 +167,12 @@ class EmailChannel(NotificationChannel):
             notifications: QuerySet of notifications to include in digest
             frequency: The frequency for template context
         """
-        from .models import Notification
-
         if not notifications.exists():
             return
 
         try:
             # Group notifications by type for better digest formatting
-            notifications_by_type: dict[str, list[Notification]] = {}
+            notifications_by_type: dict[str, list["Notification"]] = {}
             for notification in notifications:
                 if notification.notification_type not in notifications_by_type:
                     notifications_by_type[notification.notification_type] = []

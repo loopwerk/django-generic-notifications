@@ -1,12 +1,10 @@
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Type
+from typing import Any, Type
 
 from .channels import EmailChannel, NotificationChannel
 from .frequencies import DailyFrequency, NotificationFrequency, RealtimeFrequency
+from .models import DisabledNotificationTypeChannel, EmailFrequency, Notification
 from .registry import registry
-
-if TYPE_CHECKING:
-    from .models import Notification
 
 
 class NotificationType(ABC):
@@ -24,7 +22,7 @@ class NotificationType(ABC):
         return self.name
 
     @classmethod
-    def should_save(cls, notification: "Notification") -> bool:
+    def should_save(cls, notification: Notification) -> bool:
         """
         A hook to prevent the saving of a new notification. You can use
         this hook to find similar (unread) notifications and then instead
@@ -36,14 +34,14 @@ class NotificationType(ABC):
         """
         return True
 
-    def get_subject(self, notification: "Notification") -> str:
+    def get_subject(self, notification: Notification) -> str:
         """
         Generate dynamic subject based on notification data.
         Override this in subclasses for custom behavior.
         """
         return ""
 
-    def get_text(self, notification: "Notification") -> str:
+    def get_text(self, notification: Notification) -> str:
         """
         Generate dynamic text based on notification data.
         Override this in subclasses for custom behavior.
@@ -59,7 +57,6 @@ class NotificationType(ABC):
             user: The user to set the frequency for
             frequency: NotificationFrequency class
         """
-        from .models import EmailFrequency
 
         EmailFrequency.objects.update_or_create(
             user=user, notification_type=cls.key, defaults={"frequency": frequency.key}
@@ -76,7 +73,6 @@ class NotificationType(ABC):
         Returns:
             NotificationFrequency class (either user preference or default)
         """
-        from .models import EmailFrequency
 
         try:
             user_frequency = EmailFrequency.objects.get(user=user, notification_type=cls.key)
@@ -92,7 +88,6 @@ class NotificationType(ABC):
         Args:
             user: The user to reset the frequency for
         """
-        from .models import EmailFrequency
 
         EmailFrequency.objects.filter(user=user, notification_type=cls.key).delete()
 
@@ -108,7 +103,6 @@ class NotificationType(ABC):
         Returns:
             List of enabled NotificationChannel classes
         """
-        from .models import DisabledNotificationTypeChannel
 
         # Get all disabled channel keys for this user/notification type in one query
         disabled_channel_keys = set(
@@ -137,7 +131,6 @@ class NotificationType(ABC):
         Returns:
             True if channel is enabled, False if disabled
         """
-        from .models import DisabledNotificationTypeChannel
 
         return not DisabledNotificationTypeChannel.objects.filter(
             user=user, notification_type=cls.key, channel=channel.key
@@ -152,7 +145,6 @@ class NotificationType(ABC):
             user: User instance
             channel: NotificationChannel class
         """
-        from .models import DisabledNotificationTypeChannel
 
         DisabledNotificationTypeChannel.objects.get_or_create(user=user, notification_type=cls.key, channel=channel.key)
 
@@ -165,7 +157,6 @@ class NotificationType(ABC):
             user: User instance
             channel: NotificationChannel class
         """
-        from .models import DisabledNotificationTypeChannel
 
         DisabledNotificationTypeChannel.objects.filter(
             user=user, notification_type=cls.key, channel=channel.key
