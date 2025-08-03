@@ -1,6 +1,6 @@
 [project]
 name = "django-generic-notifications"
-version = "1.0.0"
+version = "1.1.0"
 description = "A flexible, multi-channel notification system for Django applications with built-in support for email digests, user preferences, and extensible delivery channels."
 authors = [
     {name = "Kevin Renskers", email = "kevin@loopwerk.io"},
@@ -10,7 +10,7 @@ license-files = [ "LICENSE" ]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "django>=3.2.0",
+  "django>=4.2.0",
 ]
 keywords = [
   "django",
