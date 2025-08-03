@@ -6,10 +6,7 @@ from django.test import TestCase
 from generic_notifications.channels import WebsiteChannel
 from generic_notifications.frequencies import DailyFrequency, RealtimeFrequency
 from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency
-from generic_notifications.preferences import (
-    get_notification_preferences,
-    save_notification_preferences,
-)
+from generic_notifications.preferences import get_notification_preferences, save_notification_preferences
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
 

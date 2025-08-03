@@ -54,33 +54,33 @@ class NotificationRegistry:
 
         self._register(frequency_class, NotificationFrequency, self._frequency_classes, "NotificationFrequency", force)
 
-    def get_type(self, key: str) -> "NotificationType":
-        """Get a registered notification type instance by key"""
-        return self._type_classes[key]()
+    def get_type(self, key: str) -> Type["NotificationType"]:
+        """Get a registered notification type class by key"""
+        return self._type_classes[key]
 
-    def get_channel(self, key: str) -> "NotificationChannel":
-        """Get a registered channel instance by key"""
-        return self._channel_classes[key]()
+    def get_channel(self, key: str) -> Type["NotificationChannel"]:
+        """Get a registered channel class by key"""
+        return self._channel_classes[key]
 
-    def get_frequency(self, key: str) -> "NotificationFrequency":
-        """Get a registered frequency instance by key"""
-        return self._frequency_classes[key]()
+    def get_frequency(self, key: str) -> Type["NotificationFrequency"]:
+        """Get a registered frequency class by key"""
+        return self._frequency_classes[key]
 
-    def get_all_types(self) -> list["NotificationType"]:
-        """Get all registered notification type instances"""
-        return [cls() for cls in self._type_classes.values()]
+    def get_all_types(self) -> list[Type["NotificationType"]]:
+        """Get all registered notification type classes"""
+        return list(self._type_classes.values())
 
-    def get_all_channels(self) -> list["NotificationChannel"]:
-        """Get all registered channel instances"""
-        return [cls() for cls in self._channel_classes.values()]
+    def get_all_channels(self) -> list[Type["NotificationChannel"]]:
+        """Get all registered channel classes"""
+        return list(self._channel_classes.values())
 
-    def get_all_frequencies(self) -> list["NotificationFrequency"]:
-        """Get all registered frequency instances"""
-        return [cls() for cls in self._frequency_classes.values()]
+    def get_all_frequencies(self) -> list[Type["NotificationFrequency"]]:
+        """Get all registered frequency classes"""
+        return list(self._frequency_classes.values())
 
-    def get_realtime_frequencies(self) -> list["NotificationFrequency"]:
+    def get_realtime_frequencies(self) -> list[Type["NotificationFrequency"]]:
         """Get all frequencies marked as realtime"""
-        return [cls() for cls in self._frequency_classes.values() if cls.is_realtime]
+        return [cls for cls in self._frequency_classes.values() if cls.is_realtime]
 
     def unregister_type(self, type_class: Type["NotificationType"]) -> bool:
         """

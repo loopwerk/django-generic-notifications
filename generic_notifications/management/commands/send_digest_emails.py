@@ -1,11 +1,14 @@
 import logging
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from django.core.management.base import BaseCommand
 
 from generic_notifications.channels import EmailChannel
+from generic_notifications.frequencies import NotificationFrequency
 from generic_notifications.models import Notification
 from generic_notifications.registry import registry
+from generic_notifications.types import NotificationType
 
 User = get_user_model()
 
@@ -48,23 +51,22 @@ class Command(BaseCommand):
             return
 
         # Setup
-        email_channel = EmailChannel()
         all_notification_types = registry.get_all_types()
 
         # Get the specific frequency (required argument)
         try:
-            frequency = registry.get_frequency(target_frequency)
+            frequency_cls = registry.get_frequency(target_frequency)
         except KeyError:
             logger.error(f"Frequency '{target_frequency}' not found")
             return
 
-        if frequency.is_realtime:
+        if frequency_cls.is_realtime:
             logger.error(f"Frequency '{target_frequency}' is realtime, not a digest frequency")
             return
 
         total_emails_sent = 0
 
-        logger.info(f"Processing {frequency.name} digests...")
+        logger.info(f"Processing {frequency_cls.name} digests...")
 
         # Find all users who have unsent, unread notifications for email channel
         users_with_notifications = User.objects.filter(
@@ -75,31 +77,29 @@ class Command(BaseCommand):
 
         for user in users_with_notifications:
             # Determine which notification types should use this frequency for this user
-            relevant_types = self.get_notification_types_for_frequency(
-                user,
-                frequency.key,
-                all_notification_types,
-                email_channel,
-            )
+            relevant_types = self.get_notification_types_for_frequency(user, frequency_cls, all_notification_types)
 
             if not relevant_types:
                 continue
 
             # Get unsent notifications for these types
             # Exclude read notifications - don't email what user already saw on website
+            relevant_type_keys = [nt.key for nt in relevant_types]
             notifications = Notification.objects.filter(
                 recipient=user,
-                notification_type__in=relevant_types,
+                notification_type__in=relevant_type_keys,
                 email_sent_at__isnull=True,
                 read__isnull=True,
                 channels__icontains=f'"{EmailChannel.key}"',
             ).order_by("-added")
 
             if notifications.exists():
-                logger.info(f"  User {user.email}: {notifications.count()} notifications for {frequency.name} digest")
+                logger.info(
+                    f"  User {user.email}: {notifications.count()} notifications for {frequency_cls.name} digest"
+                )
 
                 if not dry_run:
-                    EmailChannel.send_digest_emails(user, notifications, frequency)
+                    EmailChannel.send_digest_emails(user, notifications, frequency_cls)
 
                 total_emails_sent += 1
 
@@ -117,18 +117,30 @@ class Command(BaseCommand):
         else:
             logger.info(f"Successfully sent {total_emails_sent} digest emails")
 
-    def get_notification_types_for_frequency(self, user, frequency_key, all_notification_types, email_channel):
+    def get_notification_types_for_frequency(
+        self,
+        user: AbstractUser,
+        wanted_frequency: type[NotificationFrequency],
+        all_notification_types: list[type["NotificationType"]],
+    ) -> list[type["NotificationType"]]:
         """
         Get all notification types that should use this frequency for the given user.
         This includes both explicit preferences and types that default to this frequency.
         Since notifications are only created for enabled channels, we don't need to check is_enabled.
+
+        Args:
+            user: The user to check preferences for
+            wanted_frequency: The frequency to filter by (e.g. DailyFrequency, RealtimeFrequency)
+            all_notification_types: List of all registered notification type classes
+
+        Returns:
+            List of notification type classes that use this frequency for this user
         """
-        relevant_types = set()
+        relevant_types: list[type["NotificationType"]] = []
 
         for notification_type in all_notification_types:
-            # Use EmailChannel's get_frequency method to get the frequency for this user/type
-            user_frequency = email_channel.get_frequency(user, notification_type.key)
-            if user_frequency.key == frequency_key:
-                relevant_types.add(notification_type.key)
+            user_frequency = notification_type.get_email_frequency(user)
+            if user_frequency.key == wanted_frequency.key:
+                relevant_types.append(notification_type)
 
-        return list(relevant_types)
+        return relevant_types

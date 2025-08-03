@@ -8,7 +8,7 @@ from django.db.models import QuerySet
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-from .frequencies import DailyFrequency, NotificationFrequency
+from .frequencies import NotificationFrequency
 from .registry import registry
 
 if TYPE_CHECKING:
@@ -32,23 +32,6 @@ class NotificationChannel(ABC):
             notification: Notification instance to process
         """
         pass
-
-    def is_enabled(self, user: Any, notification_type: str) -> bool:
-        """
-        Check if user has this channel enabled for this notification type.
-
-        Args:
-            user: User instance
-            notification_type: Notification type key
-
-        Returns:
-            bool: True if enabled (default), False if disabled
-        """
-        from .models import DisabledNotificationTypeChannel
-
-        return not DisabledNotificationTypeChannel.objects.filter(
-            user=user, notification_type=notification_type, channel=self.key
-        ).exists()
 
 
 def register(cls: Type[NotificationChannel]) -> Type[NotificationChannel]:
@@ -106,36 +89,13 @@ class EmailChannel(NotificationChannel):
         Args:
             notification: Notification instance to process
         """
-        frequency = self.get_frequency(notification.recipient, notification.notification_type)
+        # Get notification type class from key
+        notification_type_cls = registry.get_type(notification.notification_type)
+        frequency_cls = notification_type_cls.get_email_frequency(notification.recipient)
 
         # Send immediately if realtime, otherwise leave for digest
-        if frequency and frequency.is_realtime:
+        if frequency_cls and frequency_cls.is_realtime:
             self.send_email_now(notification)
-
-    def get_frequency(self, user: Any, notification_type: str) -> NotificationFrequency:
-        """
-        Get the user's email frequency preference for this notification type.
-
-        Args:
-            user: User instance
-            notification_type: Notification type key
-
-        Returns:
-            NotificationFrequency: NotificationFrequency instance (defaults to notification type's default)
-        """
-        from .models import EmailFrequency
-
-        try:
-            email_frequency = EmailFrequency.objects.get(user=user, notification_type=notification_type)
-            return registry.get_frequency(email_frequency.frequency)
-        except (EmailFrequency.DoesNotExist, KeyError):
-            # Get the notification type's default frequency
-            try:
-                notification_type_obj = registry.get_type(notification_type)
-                return notification_type_obj.default_email_frequency()
-            except (KeyError, AttributeError):
-                # Fallback to realtime if notification type not found or no default
-                return DailyFrequency()
 
     def send_email_now(self, notification: "Notification") -> None:
         """
@@ -196,7 +156,7 @@ class EmailChannel(NotificationChannel):
 
     @classmethod
     def send_digest_emails(
-        cls, user: Any, notifications: "QuerySet[Notification]", frequency: NotificationFrequency | None = None
+        cls, user: Any, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
     ):
         """
         Send a digest email to a specific user with specific notifications.
@@ -207,14 +167,12 @@ class EmailChannel(NotificationChannel):
             notifications: QuerySet of notifications to include in digest
             frequency: The frequency for template context
         """
-        from .models import Notification
-
         if not notifications.exists():
             return
 
         try:
             # Group notifications by type for better digest formatting
-            notifications_by_type: dict[str, list[Notification]] = {}
+            notifications_by_type: dict[str, list["Notification"]] = {}
             for notification in notifications:
                 if notification.notification_type not in notifications_by_type:
                     notifications_by_type[notification.notification_type] = []

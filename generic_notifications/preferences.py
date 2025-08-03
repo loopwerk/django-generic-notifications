@@ -1,10 +1,9 @@
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import Any, Dict, List
+
+from django.contrib.auth.models import AbstractUser
 
 from .models import DisabledNotificationTypeChannel, EmailFrequency
 from .registry import registry
-
-if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractUser
 
 
 def get_notification_preferences(user: "AbstractUser") -> List[Dict[str, Any]]:
@@ -90,9 +89,7 @@ def save_notification_preferences(user: "AbstractUser", form_data: Dict[str, Any
 
             # If checkbox not checked, create disabled entry
             if form_key not in form_data:
-                DisabledNotificationTypeChannel.objects.create(
-                    user=user, notification_type=type_key, channel=channel_key
-                )
+                notification_type.disable_channel(user=user, channel=channel)
 
         # Handle email frequency preference
         if "email" in [ch.key for ch in channels.values()]:
@@ -100,6 +97,7 @@ def save_notification_preferences(user: "AbstractUser", form_data: Dict[str, Any
             if frequency_key in form_data:
                 frequency_value = form_data[frequency_key]
                 if frequency_value in frequencies:
+                    frequency_obj = frequencies[frequency_value]
                     # Only save if different from default
                     if frequency_value != notification_type.default_email_frequency.key:
-                        EmailFrequency.objects.create(user=user, notification_type=type_key, frequency=frequency_value)
+                        notification_type.set_email_frequency(user=user, frequency=frequency_obj)

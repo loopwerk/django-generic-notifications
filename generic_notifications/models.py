@@ -43,7 +43,7 @@ class DisabledNotificationTypeChannel(models.Model):
 
     def clean(self):
         try:
-            notification_type_obj = registry.get_type(self.notification_type)
+            notification_type_cls = registry.get_type(self.notification_type)
         except KeyError:
             available_types = [t.key for t in registry.get_all_types()]
             if available_types:
@@ -56,10 +56,10 @@ class DisabledNotificationTypeChannel(models.Model):
                 )
 
         # Check if trying to disable a required channel
-        required_channel_keys = [cls.key for cls in notification_type_obj.required_channels]
+        required_channel_keys = [cls.key for cls in notification_type_cls.required_channels]
         if self.channel in required_channel_keys:
             raise ValidationError(
-                f"Cannot disable {self.channel} channel for {notification_type_obj.name} - this channel is required"
+                f"Cannot disable {self.channel} channel for {notification_type_cls.name} - this channel is required"
             )
 
         try:
@@ -204,7 +204,8 @@ class Notification(models.Model):
 
         # Get the notification type and use its dynamic generation
         try:
-            notification_type = registry.get_type(self.notification_type)
+            notification_type_cls = registry.get_type(self.notification_type)
+            notification_type = notification_type_cls()
             return notification_type.get_subject(self) or notification_type.description
         except KeyError:
             return f"Notification: {self.notification_type}"
@@ -216,7 +217,8 @@ class Notification(models.Model):
 
         # Get the notification type and use its dynamic generation
         try:
-            notification_type = registry.get_type(self.notification_type)
+            notification_type_cls = registry.get_type(self.notification_type)
+            notification_type = notification_type_cls()
             return notification_type.get_text(self)
         except KeyError:
             return "You have a new notification"
