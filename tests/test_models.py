@@ -101,10 +101,10 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
     def test_disable_channel(self):
         """Test the disable_channel class method"""
         # Verify channel is enabled initially
-        self.assertTrue(WebsiteChannel.is_enabled(self.user, TestNotificationType))
+        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
 
         # Disable the channel
-        WebsiteChannel.disable(self.user, TestNotificationType)
+        TestNotificationType.disable_channel(self.user, WebsiteChannel)
 
         # Verify it was created
         self.assertTrue(
@@ -114,10 +114,10 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
         )
 
         # Verify channel is now disabled
-        self.assertFalse(WebsiteChannel.is_enabled(self.user, TestNotificationType))
+        self.assertFalse(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
 
         # Disabling again should not create duplicate (get_or_create behavior)
-        WebsiteChannel.disable(self.user, TestNotificationType)
+        TestNotificationType.disable_channel(self.user, WebsiteChannel)
         self.assertEqual(
             DisabledNotificationTypeChannel.objects.filter(
                 user=self.user, notification_type="test_type", channel="website"
@@ -129,10 +129,10 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
         """Test the enable_channel class method"""
         # First disable the channel
         DisabledNotificationTypeChannel.objects.create(user=self.user, notification_type="test_type", channel="website")
-        self.assertFalse(WebsiteChannel.is_enabled(self.user, TestNotificationType))
+        self.assertFalse(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
 
         # Enable the channel
-        WebsiteChannel.enable(self.user, TestNotificationType)
+        TestNotificationType.enable_channel(self.user, WebsiteChannel)
 
         # Verify the disabled entry was removed
         self.assertFalse(
@@ -142,28 +142,28 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
         )
 
         # Verify channel is now enabled
-        self.assertTrue(WebsiteChannel.is_enabled(self.user, TestNotificationType))
+        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
 
         # Enabling an already enabled channel should work without error
-        WebsiteChannel.enable(self.user, TestNotificationType)
-        self.assertTrue(WebsiteChannel.is_enabled(self.user, TestNotificationType))
+        TestNotificationType.enable_channel(self.user, WebsiteChannel)
+        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
 
     def test_is_channel_enabled(self):
         """Test the is_channel_enabled class method"""
         # By default, all channels should be enabled
-        self.assertTrue(WebsiteChannel.is_enabled(self.user, TestNotificationType))
-        self.assertTrue(EmailChannel.is_enabled(self.user, TestNotificationType))
+        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
+        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, EmailChannel))
 
         # Disable website channel
         DisabledNotificationTypeChannel.objects.create(user=self.user, notification_type="test_type", channel="website")
 
         # Website should be disabled, email should still be enabled
-        self.assertFalse(WebsiteChannel.is_enabled(self.user, TestNotificationType))
-        self.assertTrue(EmailChannel.is_enabled(self.user, TestNotificationType))
+        self.assertFalse(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
+        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, EmailChannel))
 
         # Different user should not be affected
         other_user = User.objects.create_user(username="other", email="other@example.com", password="pass")
-        self.assertTrue(WebsiteChannel.is_enabled(other_user, TestNotificationType))
+        self.assertTrue(TestNotificationType.is_channel_enabled(other_user, WebsiteChannel))
 
 
 class EmailFrequencyModelTest(TestCase):

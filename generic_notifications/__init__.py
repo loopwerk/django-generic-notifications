@@ -59,7 +59,7 @@ def send_notification(
     enabled_channels = []
     enabled_channel_instances = []
     for channel_cls in registry.get_all_channels():
-        if channel_cls.is_enabled(recipient, notification_type):
+        if notification_type.is_channel_enabled(recipient, channel_cls):
             enabled_channels.append(channel_cls.key)
             enabled_channel_instances.append(channel_cls())
 

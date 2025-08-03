@@ -13,7 +13,6 @@ from .registry import registry
 
 if TYPE_CHECKING:
     from .models import Notification
-    from .types import NotificationType
 
 
 class NotificationChannel(ABC):
@@ -33,54 +32,6 @@ class NotificationChannel(ABC):
             notification: Notification instance to process
         """
         pass
-
-    @classmethod
-    def is_enabled(cls, user: Any, notification_type: "type[NotificationType]") -> bool:
-        """
-        Check if this channel is enabled for a user and notification type.
-
-        Args:
-            user: User instance
-            notification_type: NotificationType class
-
-        Returns:
-            True if channel is enabled, False if disabled
-        """
-        from .models import DisabledNotificationTypeChannel
-
-        return not DisabledNotificationTypeChannel.objects.filter(
-            user=user, notification_type=notification_type.key, channel=cls.key
-        ).exists()
-
-    @classmethod
-    def disable(cls, user: Any, notification_type: "type[NotificationType]") -> None:
-        """
-        Disable this channel for a user and notification type.
-
-        Args:
-            user: User instance
-            notification_type: NotificationType class
-        """
-        from .models import DisabledNotificationTypeChannel
-
-        DisabledNotificationTypeChannel.objects.get_or_create(
-            user=user, notification_type=notification_type.key, channel=cls.key
-        )
-
-    @classmethod
-    def enable(cls, user: Any, notification_type: "type[NotificationType]") -> None:
-        """
-        Enable this channel for a user and notification type.
-
-        Args:
-            user: User instance
-            notification_type: NotificationType class
-        """
-        from .models import DisabledNotificationTypeChannel
-
-        DisabledNotificationTypeChannel.objects.filter(
-            user=user, notification_type=notification_type.key, channel=cls.key
-        ).delete()
 
 
 def register(cls: Type[NotificationChannel]) -> Type[NotificationChannel]:

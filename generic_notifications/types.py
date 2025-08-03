@@ -96,6 +96,52 @@ class NotificationType(ABC):
 
         EmailFrequency.objects.filter(user=user, notification_type=cls.key).delete()
 
+    @classmethod
+    def is_channel_enabled(cls, user: Any, channel: Type[NotificationChannel]) -> bool:
+        """
+        Check if a channel is enabled for this notification type for a user.
+
+        Args:
+            user: User instance
+            channel: NotificationChannel class
+
+        Returns:
+            True if channel is enabled, False if disabled
+        """
+        from .models import DisabledNotificationTypeChannel
+
+        return not DisabledNotificationTypeChannel.objects.filter(
+            user=user, notification_type=cls.key, channel=channel.key
+        ).exists()
+
+    @classmethod
+    def disable_channel(cls, user: Any, channel: Type[NotificationChannel]) -> None:
+        """
+        Disable a channel for this notification type for a user.
+
+        Args:
+            user: User instance
+            channel: NotificationChannel class
+        """
+        from .models import DisabledNotificationTypeChannel
+
+        DisabledNotificationTypeChannel.objects.get_or_create(user=user, notification_type=cls.key, channel=channel.key)
+
+    @classmethod
+    def enable_channel(cls, user: Any, channel: Type[NotificationChannel]) -> None:
+        """
+        Enable a channel for this notification type for a user.
+
+        Args:
+            user: User instance
+            channel: NotificationChannel class
+        """
+        from .models import DisabledNotificationTypeChannel
+
+        DisabledNotificationTypeChannel.objects.filter(
+            user=user, notification_type=cls.key, channel=channel.key
+        ).delete()
+
 
 def register(cls: Type[NotificationType]) -> Type[NotificationType]:
     """

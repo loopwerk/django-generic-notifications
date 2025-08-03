@@ -90,7 +90,7 @@ def save_notification_preferences(user: "AbstractUser", form_data: Dict[str, Any
 
             # If checkbox not checked, create disabled entry
             if form_key not in form_data:
-                channel.disable(user=user, notification_type=notification_type)
+                notification_type.disable_channel(user=user, channel=channel)
 
         # Handle email frequency preference
         if "email" in [ch.key for ch in channels.values()]:

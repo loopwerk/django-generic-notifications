@@ -51,7 +51,7 @@ class NotificationChannelTest(TestCase):
                 pass
 
         # By default, all notifications are enabled
-        self.assertTrue(TestChannel.is_enabled(self.user, TestNotificationType))
+        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, TestChannel))
 
     def test_is_enabled_with_disabled_notification(self):
         class TestChannel(NotificationChannel):
@@ -75,10 +75,10 @@ class NotificationChannelTest(TestCase):
         )
 
         # Should be disabled for this type
-        self.assertFalse(TestChannel.is_enabled(self.user, DisabledNotificationType))
+        self.assertFalse(DisabledNotificationType.is_channel_enabled(self.user, TestChannel))
 
         # But enabled for other types
-        self.assertTrue(TestChannel.is_enabled(self.user, OtherNotificationType))
+        self.assertTrue(OtherNotificationType.is_channel_enabled(self.user, TestChannel))
 
 
 class WebsiteChannelTest(TestCase):
