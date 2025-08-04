@@ -77,8 +77,13 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           exclude_types: other,doc,chore,build
 
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%B %-d, %Y')" >> $GITHUB_OUTPUT
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ github.ref_name }} (${{ steps.date.outputs.date }})
           body: ${{ steps.changelog.outputs.changes }}
           token: ${{ secrets.GITHUB_TOKEN }}
