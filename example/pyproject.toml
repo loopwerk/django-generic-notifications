@@ -12,7 +12,7 @@ dependencies = [
 package = false
 
 [tool.uv.sources]
-django-generic-notifications = { path = "../" }
+django-generic-notifications = { path = "../", editable = true }
 
 [dependency-groups]
 dev = [
