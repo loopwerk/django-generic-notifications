@@ -10,6 +10,26 @@ permissions:
   id-token: write
 
 jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Validate version matches tag
+        run: |
+          TAG_VERSION=${{ github.ref_name }}
+          PYPROJECT_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "Error: Git tag ($TAG_VERSION) doesn't match pyproject.toml version ($PYPROJECT_VERSION)"
+            exit 1
+          fi
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -52,7 +72,7 @@ jobs:
         run: uv run pytest
 
   build-and-publish:
-    needs: [lint, test]
+    needs: [validate-version, lint, test]
     runs-on: ubuntu-latest
 
     steps:
