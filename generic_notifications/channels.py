@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Type
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db.models import QuerySet
+from django.template.defaultfilters import pluralize
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -190,13 +191,15 @@ class EmailChannel(NotificationChannel):
             html_template = "notifications/email/digest/message.html"
             text_template = "notifications/email/digest/message.txt"
 
+            notifications_count = notifications.count()
+
             # Load subject
             try:
                 subject = render_to_string(subject_template, context).strip()
             except Exception:
                 # Fallback subject
                 frequency_name = frequency.name if frequency else "Digest"
-                subject = f"{frequency_name} - {notifications.count()} new notifications"
+                subject = f"{frequency_name} - {notifications_count} new notification{pluralize(notifications_count)}"
 
             # Load HTML message
             try:
@@ -210,11 +213,11 @@ class EmailChannel(NotificationChannel):
                 text_message = render_to_string(text_template, context)
             except Exception:
                 # Fallback if template doesn't exist
-                message_lines = [f"You have {notifications.count()} new notifications:"]
+                message_lines = [f"You have {notifications_count} new notification{pluralize(notifications_count)}:\n"]
                 for notification in notifications[:10]:  # Limit to first 10
-                    message_lines.append(f"- {notification.get_subject()}")
-                if notifications.count() > 10:
-                    message_lines.append(f"... and {notifications.count() - 10} more")
+                    message_lines.append(f"- {notification.get_text()}")
+                if notifications_count > 10:
+                    message_lines.append(f"... and {notifications_count - 10} more")
                 text_message = "\n".join(message_lines)
 
             send_mail(

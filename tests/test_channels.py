@@ -288,7 +288,7 @@ class EmailChannelTest(TestCase):
         )
 
         email = mail.outbox[0]
-        self.assertIn("1 new notifications", email.subject)
+        self.assertIn("1 new notification", email.subject)
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_without_frequency(self):
@@ -302,7 +302,7 @@ class EmailChannelTest(TestCase):
         )
 
         email = mail.outbox[0]
-        self.assertIn("Digest - 1 new notifications", email.subject)
+        self.assertIn("Digest - 1 new notification", email.subject)
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_text_limit(self):

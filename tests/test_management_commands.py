@@ -98,8 +98,8 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # Check email details
         self.assertEqual(email.to, [self.user1.email])
-        self.assertIn("1 new notifications", email.subject)
-        self.assertIn("Test notification", email.body)
+        self.assertIn("1 new notification", email.subject)
+        self.assertIn("This is a test notification", email.body)
 
         # Verify notification was marked as sent
         notification.refresh_from_db()
@@ -129,12 +129,20 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # Create read and unread notifications
         read_notification = Notification.objects.create(
-            recipient=self.user1, notification_type="test_type", subject="Read notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="test_type",
+            subject="Read notification subject",
+            text="Read notification text",
+            channels=["email"],
         )
         read_notification.mark_as_read()
 
         unread_notification = Notification.objects.create(
-            recipient=self.user1, notification_type="test_type", subject="Unread notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="test_type",
+            subject="Unread notification subject",
+            text="Unread notification text",
+            channels=["email"],
         )
 
         call_command("send_digest_emails", "--frequency", "daily")
@@ -142,8 +150,8 @@ class SendDigestEmailsCommandTest(TestCase):
         # Should send one email with only unread notification
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
-        self.assertIn("Unread notification", email.body)
-        self.assertNotIn("Read notification", email.body)
+        self.assertIn("Unread notification text", email.body)
+        self.assertNotIn("Read notification text", email.body)
 
         # Only unread notification should be marked as sent
         read_notification.refresh_from_db()
@@ -164,7 +172,11 @@ class SendDigestEmailsCommandTest(TestCase):
         )
 
         unsent_notification = Notification.objects.create(
-            recipient=self.user1, notification_type="test_type", subject="Unsent notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="test_type",
+            subject="Unsent notification subject",
+            text="Unsent notification text",
+            channels=["email"],
         )
 
         call_command("send_digest_emails", "--frequency", "daily")
@@ -172,8 +184,8 @@ class SendDigestEmailsCommandTest(TestCase):
         # Should send one email with only unsent notification
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
-        self.assertIn("Unsent notification", email.body)
-        self.assertNotIn("Sent notification", email.body)
+        self.assertIn("Unsent notification text", email.body)
+        self.assertNotIn("Sent notification text", email.body)
 
         # Unsent notification should now be marked as sent
         unsent_notification.refresh_from_db()
@@ -184,7 +196,11 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # Create notification older than time window (>1 day ago)
         old_notification = Notification.objects.create(
-            recipient=self.user1, notification_type="test_type", subject="Old notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="test_type",
+            subject="Old notification subject",
+            text="Old notification text",
+            channels=["email"],
         )
         # Manually set old timestamp
         old_time = timezone.now() - timedelta(days=2)
@@ -192,7 +208,11 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # Create recent notification
         recent_notification = Notification.objects.create(
-            recipient=self.user1, notification_type="test_type", subject="Recent notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="test_type",
+            subject="Recent notification subject",
+            text="Recent notification text",
+            channels=["email"],
         )
 
         call_command("send_digest_emails", "--frequency", "daily")
@@ -200,8 +220,8 @@ class SendDigestEmailsCommandTest(TestCase):
         # Should send one email with both notifications (no time window filtering)
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
-        self.assertIn("Recent notification", email.body)
-        self.assertIn("Old notification", email.body)
+        self.assertIn("Recent notification text", email.body)
+        self.assertIn("Old notification text", email.body)
         self.assertIn("2 new notifications", email.subject)
 
         # Both notifications should be marked as sent
@@ -218,10 +238,18 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # Create notifications for both
         Notification.objects.create(
-            recipient=self.user1, notification_type="test_type", subject="Daily user notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="test_type",
+            subject="Daily user notification subject",
+            text="Daily user notification text",
+            channels=["email"],
         )
         Notification.objects.create(
-            recipient=self.user2, notification_type="test_type", subject="Weekly user notification", channels=["email"]
+            recipient=self.user2,
+            notification_type="test_type",
+            subject="Weekly user notification subject",
+            text="Weekly user notification text",
+            channels=["email"],
         )
 
         call_command("send_digest_emails", "--frequency", "daily")
@@ -230,7 +258,7 @@ class SendDigestEmailsCommandTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
         self.assertEqual(email.to, [self.user1.email])
-        self.assertIn("Daily user notification", email.body)
+        self.assertIn("Daily user notification text", email.body)
 
         # Clear outbox and test weekly frequency
         mail.outbox.clear()
@@ -240,7 +268,7 @@ class SendDigestEmailsCommandTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
         self.assertEqual(email.to, [self.user2.email])
-        self.assertIn("Weekly user notification", email.body)
+        self.assertIn("Weekly user notification text", email.body)
 
     def test_multiple_notification_types_for_user(self):
         # Set up user with multiple notification types for daily frequency
@@ -249,10 +277,18 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # Create notifications of both types
         notification1 = Notification.objects.create(
-            recipient=self.user1, notification_type="test_type", subject="Test type notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="test_type",
+            subject="Test type notification subject",
+            text="Test type notification text",
+            channels=["email"],
         )
         notification2 = Notification.objects.create(
-            recipient=self.user1, notification_type="other_type", subject="Other type notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="other_type",
+            subject="Other type notification subject",
+            text="Other type notification text",
+            channels=["email"],
         )
 
         call_command("send_digest_emails", "--frequency", "daily")
@@ -262,8 +298,8 @@ class SendDigestEmailsCommandTest(TestCase):
         email = mail.outbox[0]
         self.assertEqual(email.to, [self.user1.email])
         self.assertIn("2 new notifications", email.subject)
-        self.assertIn("Test type notification", email.body)
-        self.assertIn("Other type notification", email.body)
+        self.assertIn("Test type notification text", email.body)
+        self.assertIn("Other type notification text", email.body)
 
         # Both notifications should be marked as sent
         notification1.refresh_from_db()
@@ -321,8 +357,8 @@ class SendDigestEmailsCommandTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
         self.assertEqual(email.to, [self.user1.email])
-        self.assertIn("Test notification", email.body)
-        self.assertNotIn("Other notification", email.body)
+        self.assertIn("This is a test notification", email.body)
+        self.assertNotIn("This is another type of notification", email.body)
 
         # Verify only test notification was marked as sent
         test_notification.refresh_from_db()
@@ -338,10 +374,18 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # Create notifications
         Notification.objects.create(
-            recipient=self.user1, notification_type="test_type", subject="Test notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="test_type",
+            subject="Test notification subject",
+            text="Test notification text",
+            channels=["email"],
         )
         Notification.objects.create(
-            recipient=self.user1, notification_type="other_type", subject="Other notification", channels=["email"]
+            recipient=self.user1,
+            notification_type="other_type",
+            subject="Other notification subject",
+            text="Other notification text",
+            channels=["email"],
         )
 
         # Run daily digest - should get nothing (test_type is weekly, other_type is realtime)
@@ -352,8 +396,8 @@ class SendDigestEmailsCommandTest(TestCase):
         call_command("send_digest_emails", "--frequency", "weekly")
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
-        self.assertIn("Test notification", email.body)
-        self.assertNotIn("Other notification", email.body)
+        self.assertIn("Test notification text", email.body)
+        self.assertNotIn("Other notification text", email.body)
 
     def test_multiple_users_default_and_explicit_mix(self):
         """Test digest emails work correctly with multiple users having different preference configurations."""
@@ -369,7 +413,8 @@ class SendDigestEmailsCommandTest(TestCase):
             Notification.objects.create(
                 recipient=user,
                 notification_type="test_type",
-                subject=f"Test notification for user {i}",
+                subject=f"Test notification for user {i} subject",
+                text=f"Test notification for user {i} text",
                 channels=["email"],
             )
 
@@ -387,4 +432,4 @@ class SendDigestEmailsCommandTest(TestCase):
         call_command("send_digest_emails", "--frequency", "weekly")
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to[0], self.user2.email)
-        self.assertIn("Test notification for user 2", mail.outbox[0].body)
+        self.assertIn("Test notification for user 2 text", mail.outbox[0].body)
