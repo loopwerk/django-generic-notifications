@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -226,3 +227,48 @@ class Notification(models.Model):
     @property
     def is_read(self) -> bool:
         return self.read is not None
+
+    def get_absolute_url(self) -> str:
+        """
+        Get the absolute URL for this notification.
+        If the URL is already absolute (starts with http:// or https://), return as-is.
+        Otherwise, prepend the base URL from settings if available.
+        """
+        if not self.url:
+            return ""
+
+        # If already absolute, return as-is
+        if self.url.startswith(("http://", "https://")):
+            return self.url
+
+        # Get base URL from settings, with fallback
+        base_url = getattr(settings, "NOTIFICATION_BASE_URL", "")
+
+        if not base_url:
+            # Try common alternatives
+            base_url = getattr(settings, "BASE_URL", "")
+            if not base_url:
+                base_url = getattr(settings, "SITE_URL", "")
+
+        if not base_url and "django.contrib.sites" in settings.INSTALLED_APPS:
+            # Try the Sites framework
+            from django.contrib.sites.models import Site
+
+            try:
+                base_url = Site.objects.get_current().domain
+            except Site.DoesNotExist:
+                pass
+
+        if base_url:
+            # Add protocol if missing
+            if not base_url.startswith(("http://", "https://")):
+                protocol = "http" if settings.DEBUG else "https"
+                base_url = f"{protocol}://{base_url}"
+
+            # Ensure base URL doesn't end with slash and relative URL doesn't start with slash
+            base_url = base_url.rstrip("/")
+            relative_url = self.url.lstrip("/")
+            return f"{base_url}/{relative_url}"
+
+        # No base URL configured, return relative URL
+        return self.url

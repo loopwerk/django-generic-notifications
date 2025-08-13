@@ -27,6 +27,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
+# Base URL for generating absolute URLs in notifications
+# In production, set this to your domain: NOTIFICATION_BASE_URL = "https://yourdomain.com"
+NOTIFICATION_BASE_URL = "http://localhost:8000"
+
 
 # Application definition
 

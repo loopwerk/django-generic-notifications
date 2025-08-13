@@ -300,3 +300,89 @@ class NotificationModelTest(TestCase):
 
         notification.refresh_from_db()
         self.assertEqual(notification.email_sent_at, sent_time)
+
+    def test_get_absolute_url_empty_url(self):
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key],
+        )
+        self.assertEqual(notification.get_absolute_url(), "")
+
+    def test_get_absolute_url_already_absolute(self):
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key],
+            url="https://example.com/path",
+        )
+        self.assertEqual(notification.get_absolute_url(), "https://example.com/path")
+
+    def test_get_absolute_url_with_setting(self):
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key],
+            url="/notifications/123",
+        )
+
+        with self.settings(NOTIFICATION_BASE_URL="https://mysite.com"):
+            self.assertEqual(notification.get_absolute_url(), "https://mysite.com/notifications/123")
+
+    def test_get_absolute_url_with_setting_no_protocol_debug(self):
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key],
+            url="/notifications/123",
+        )
+
+        with self.settings(NOTIFICATION_BASE_URL="mysite.com", DEBUG=True):
+            # Should add http protocol in debug mode
+            self.assertEqual(notification.get_absolute_url(), "http://mysite.com/notifications/123")
+
+    def test_get_absolute_url_with_setting_no_protocol_production(self):
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key],
+            url="/notifications/123",
+        )
+
+        with self.settings(NOTIFICATION_BASE_URL="mysite.com", DEBUG=False):
+            # Should add https protocol in production mode
+            self.assertEqual(notification.get_absolute_url(), "https://mysite.com/notifications/123")
+
+    def test_get_absolute_url_fallback_settings(self):
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key],
+            url="/notifications/123",
+        )
+
+        with self.settings(BASE_URL="https://fallback.com"):
+            self.assertEqual(notification.get_absolute_url(), "https://fallback.com/notifications/123")
+
+    def test_get_absolute_url_fallback_settings_no_protocol(self):
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key],
+            url="/notifications/123",
+        )
+
+        with self.settings(BASE_URL="fallback.com", DEBUG=False):
+            # Should add https protocol in production mode for fallback setting
+            self.assertEqual(notification.get_absolute_url(), "https://fallback.com/notifications/123")
+
+    def test_get_absolute_url_no_base_url(self):
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=[WebsiteChannel.key],
+            url="/notifications/123",
+        )
+
+        # When no base URL is available, should return the relative URL
+        self.assertEqual(notification.get_absolute_url(), "/notifications/123")

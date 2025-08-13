@@ -38,6 +38,31 @@ Run migrations:
 uv run ./manage.py migrate generic_notifications
 ```
 
+## Settings
+
+### `NOTIFICATION_BASE_URL`
+
+Configure the base URL for generating absolute URLs in email notifications:
+
+```python
+# With protocol (recommended)
+NOTIFICATION_BASE_URL = "https://www.example.com"
+NOTIFICATION_BASE_URL = "http://localhost:8000"
+
+# Without protocol (auto-detects based on DEBUG setting)
+NOTIFICATION_BASE_URL = "www.example.com"
+```
+
+**Protocol handling**: If you omit the protocol, it's automatically added:
+- `https://` in production (`DEBUG = False`)  
+- `http://` in development (`DEBUG = True`)
+
+**Fallback order** if `NOTIFICATION_BASE_URL` is not set:
+1. `BASE_URL` setting  
+2. `SITE_URL` setting
+3. Django Sites framework (if `django.contrib.sites` is installed)
+4. URLs remain relative if no base URL is found (not ideal in emails!)
+
 ## Quick Start
 
 ### 1. Define a notification type

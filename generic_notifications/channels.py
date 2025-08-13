@@ -135,8 +135,11 @@ class EmailChannel(NotificationChannel):
             try:
                 text_message = render_to_string(text_template, context)
             except Exception:
-                # Fallback to notification's text
+                # Fallback to notification's text with URL if available
                 text_message = notification.get_text()
+                absolute_url = notification.get_absolute_url()
+                if absolute_url:
+                    text_message += f"\n{absolute_url}"
 
             send_mail(
                 subject=subject,
@@ -216,6 +219,9 @@ class EmailChannel(NotificationChannel):
                 message_lines = [f"You have {notifications_count} new notification{pluralize(notifications_count)}:\n"]
                 for notification in notifications[:10]:  # Limit to first 10
                     message_lines.append(f"- {notification.get_text()}")
+                    absolute_url = notification.get_absolute_url()
+                    if absolute_url:
+                        message_lines.append(f"  {absolute_url}")
                 if notifications_count > 10:
                     message_lines.append(f"... and {notifications_count - 10} more")
                 text_message = "\n".join(message_lines)

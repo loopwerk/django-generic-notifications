@@ -269,7 +269,7 @@ class EmailChannelTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
         self.assertEqual(email.to, [self.user.email])
-        self.assertIn("3 new notifications", email.subject)
+        self.assertEqual(email.subject, "Digest - 3 new notifications")
 
         # Check all notifications marked as sent
         for notification in notifications:
@@ -288,7 +288,7 @@ class EmailChannelTest(TestCase):
         )
 
         email = mail.outbox[0]
-        self.assertIn("1 new notification", email.subject)
+        self.assertEqual(email.subject, "Digest - 1 new notification")
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_without_frequency(self):
@@ -302,7 +302,7 @@ class EmailChannelTest(TestCase):
         )
 
         email = mail.outbox[0]
-        self.assertIn("Digest - 1 new notification", email.subject)
+        self.assertEqual(email.subject, "Digest - 1 new notification")
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_text_limit(self):
@@ -322,7 +322,7 @@ class EmailChannelTest(TestCase):
         # The implementation may not have this feature, so we'll just check that email was sent
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
-        self.assertIn("15 new notifications", email.subject)
+        self.assertEqual(email.subject, "Digest - 15 new notifications")
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     @patch("generic_notifications.channels.render_to_string")
@@ -354,3 +354,59 @@ class EmailChannelTest(TestCase):
         self.assertEqual(text_call[0][0], "notifications/email/digest/message.txt")
         self.assertEqual(html_call[0][1]["user"], self.user)
         self.assertEqual(html_call[0][1]["count"], 1)
+
+    def test_send_email_now_fallback_includes_url(self):
+        """Test that fallback email content includes URL when available"""
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=["email"],
+            subject="Test Subject",
+            text="Test notification text",
+            url="https://example.com/test/url/123",
+        )
+
+        EmailChannel().send_email_now(notification)
+
+        # Check that one email was sent
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+
+        # Check the exact email body content
+        expected_body = "Test notification text\nhttps://example.com/test/url/123"
+        self.assertEqual(sent_email.body, expected_body)
+
+    def test_send_digest_emails_fallback_includes_urls(self):
+        """Test that digest fallback email content includes URLs when available"""
+        # Create notifications with URLs
+        Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=["email"],
+            text="First notification",
+            url="https://example.com/url/1",
+        )
+        Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=["email"],
+            text="Second notification",
+            url="https://example.com/url/2",
+        )
+
+        EmailChannel.send_digest_emails(
+            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
+        )
+
+        # Check that one email was sent
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+
+        # Check the exact digest email body content
+        expected_body = """You have 2 new notifications:
+
+- Second notification
+  https://example.com/url/2
+- First notification
+  https://example.com/url/1"""
+        self.assertEqual(sent_email.body, expected_body)
