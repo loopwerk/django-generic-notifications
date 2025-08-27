@@ -227,6 +227,7 @@ class SecurityAlert(NotificationType):
 ### Querying Notifications
 
 ```python
+from generic_notifications.channels import WebsiteChannel
 from generic_notifications.models import Notification
 from generic_notifications.lib import get_unread_count, get_notifications, mark_notifications_as_read
 
@@ -237,9 +238,10 @@ unread_count = get_unread_count(user=user, channel=WebsiteChannel)
 unread_notifications = get_notifications(user=user, channel=WebsiteChannel, unread_only=True)
 
 # Get notifications by channel
-email_notifications = Notification.objects.for_channel(WebsiteChannel)
+website_notifications = Notification.objects.for_channel(WebsiteChannel)
 
 # Mark as read
+notification = website_notifications.first()
 notification.mark_as_read()
 
 # Mark all as read
