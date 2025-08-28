@@ -207,6 +207,45 @@ Customize email templates by creating these files in your templates directory:
 - `notifications/email/digest/message.html`
 - `notifications/email/digest/message.txt`
 
+## Admin Integration
+
+While the library doesn't register admin classes by default, the [example app](#example-app) includes [admin configuration](example/notifications/admin.py) that you can copy into your project for development debugging and monitoring purposes.
+
+For production environments, you may want to make the admin interface read-only to prevent accidental modifications:
+
+```python
+from django.contrib import admin
+from generic_notifications.models import Notification
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ["recipient", "notification_type", "added", "channels"]
+    readonly_fields = [
+        "recipient",
+        "notification_type",
+        "added",
+        "read",
+        "subject",
+        "text",
+        "url",
+        "actor",
+        "content_type",
+        "object_id",
+        "target",
+        "email_sent_at",
+        "channels",
+        "metadata",
+    ]
+
+    # If you want, you can also restrict adding or deleting notifications in the admin
+    # with these two methods as well:
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+```
+
 ## Advanced Usage
 
 ### Required Channels
