@@ -207,6 +207,10 @@ Customize email templates by creating these files in your templates directory:
 - `notifications/email/digest/message.html`
 - `notifications/email/digest/message.txt`
 
+## Admin Integration
+
+While the library doesn't register admin classes by default, the [example app](#example-app) includes [admin configuration](https://github.com/loopwerk/django-generic-notifications/tree/main/example/notifications/admin.py) that you can copy into your project for debugging and monitoring purposes.
+
 ## Advanced Usage
 
 ### Required Channels
