@@ -213,7 +213,7 @@ While the library doesn't register admin classes by default, the [example app](#
 
 ## Advanced Usage
 
-### Required Channels
+### Required channels
 
 Make certain channels mandatory for critical notifications:
 
@@ -228,7 +228,7 @@ class SecurityAlert(NotificationType):
     required_channels = [EmailChannel]  # Cannot be disabled
 ```
 
-### Querying Notifications
+### Querying notifications
 
 ```python
 from generic_notifications.channels import WebsiteChannel
@@ -252,7 +252,7 @@ notification.mark_as_read()
 mark_notifications_as_read(user=user)
 ```
 
-### Notification Grouping
+### Notification grouping
 
 Prevent notification spam by grouping similar notifications together. Instead of creating multiple "You received a comment" notifications, you can update an existing notification to say "You received 3 comments".
 
@@ -301,11 +301,20 @@ The `should_save` method is called before saving each notification. Return `Fals
 
 ### Accessing `notification.target`
 
-While you can store any object into a notification's `target` field, it's usually not a great idea to use this field to dynamically create the notification's subject and text, as the `target` generic relationship can't be prefetched more than one level deep.
+The `target` field is a GenericForeignKey that can point to any Django model instance. While convenient, accessing targets requires careful consideration for performance.
 
-In other words, something like this will cause an N+1 query problem when you show a list of notifications in a table, for example:
+When using Django 5.0+, this library automatically includes `.prefetch_related("target")` when using the standard query methods. This efficiently fetches target objects, but only the *direct* targets - accessing relationships *through* the target will still cause additional queries. 
+
+*On Django 4.2, you'll need to manually deal with prefetching the `target` relationship.*
+
+Consider this problematic example that will cause N+1 queries:
 
 ```python
+class Article(models.Model):
+    title = models.CharField(max_length=255)
+    text = models.TextField()
+
+
 class Comment(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -319,20 +328,68 @@ class CommentNotificationType(NotificationType):
     description = "You received a comment"
 
     def get_text(self, notification):
-          actor_name = notification.actor.full_name
-          article = notification.target.article
-          comment_text = notification.target.comment.comment_text
-          return f'{actor_name} commented on your article "{article.title}": "{comment_text}"'
-
+        actor_name = notification.actor.full_name
+        article = notification.target.article
+        comment_text = notification.target.comment_text
+        
+        # This causes an extra query per notification!
+        return f'{actor_name} commented on your article "{article.title}": "{comment_text}"'
 ```
 
-The problem is `target.article`, which cannot be prefetched and thus causes another query for every notification. This is why it’s better to store the subject, text and url in the notification itself, rather than relying on `target` dynamically.
+When displaying a list of 10 notifications, this will execute:
+
+- 1 query for the notifications
+- 1 query for the target comments (Django 5.0+ only, automatically prefetched)
+- 10 queries for the articles (N+1 problem!)
+
+#### Solution 1: store data in the notification
+
+The simplest approach is to store the needed data directly in the notification:
+
+```python
+send_notification(
+    recipient=article.author,
+    notification_type=CommentNotificationType,
+    actor=commenter,
+    target=comment,
+    subject=f"New comment on {article.title}",
+    text=f'{commenter.full_name} commented on your article "{article.title}": "{comment.comment_text}"',
+    url=article.get_absolute_url()
+)
+```
+
+However, this only works if you don’t need to dynamically generate the text - for example to make sure the text is always up to date, or to deal with internationalization.
+
+#### Solution 2: prefetch deeper relationships
+
+If you must access relationships through the target, you can prefetch them:
+
+```python
+# On Django 5.0+ the library already prefetches targets, 
+# but you need to add deeper relationships yourself
+notifications = get_notifications(user).prefetch_related(
+    "target__article"  # This prevents the N+1 problem
+)
+```
+
+**Note**: This approach has limitations:
+- You need to know the target's type and relationships in advance
+- It won't work efficiently with heterogeneous targets (different model types)
+- Each additional relationship level requires explicit prefetching
+
+#### Recommended approach
+
+For best performance:
+
+1. If possible, store all display data directly in the notification (subject, text, url)
+2. If you need dynamic text, prefer accessing only direct fields on the target
+3. Otherwise, make sure you prefetch the right relationships
 
 ### Non-blocking email sending
 
 The email channel (EmailChannel) will send real-time emails using Django’s built-in `send_mail` method. This is a blocking function call, meaning that while a connection with the SMTP server is made and the email is sent off, the process that’s sending the notification has to wait. This is not ideal, but easily solved by using something like [django-mailer](https://github.com/pinax/django-mailer/), which provides a queueing backend for `send_mail`. This means that sending email is no longer a blocking action.
 
-## Example app
+## Example App
 
 An example app is provided, which shows how to create a custom notification type, how to send a notification, it has a nice looking notification center with unread notifications as well as an archive of all read notifications, plus a settings view where you can manage notification preferences.
 
@@ -361,7 +418,7 @@ cd django-generic-notifications
 uv run pytest
 ```
 
-### Code Quality
+### Code quality
 
 ```bash
 # Type checking

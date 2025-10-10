@@ -61,7 +61,6 @@ class NotificationPerformanceTest(TestCase):
     def test_notification_target_access_queries(self):
         """Test queries when accessing notification.target in template"""
         # Create notifications with targets
-        Notification.objects.all().delete()
         for i in range(5):
             Notification.objects.create(
                 recipient=self.user,
@@ -74,11 +73,84 @@ class NotificationPerformanceTest(TestCase):
             )
 
         # First, evaluate the queryset
-        notifications = get_notifications(self.user)
-        notifications_list = list(notifications)
+        with self.assertNumQueries(2):  # 1 for notifications + 1 for targets
+            notifications = get_notifications(self.user)
+            notifications_list = list(notifications)
 
-        # Test accessing target - this will cause queries
-        with self.assertNumQueries(5):  # Expecting 5 queries
+        # Test accessing target - should be 0 queries since we prefetch target
+        with self.assertNumQueries(0):
             for notification in notifications_list:
                 if notification.target and hasattr(notification.target, "email"):
                     _ = notification.target.email
+
+    def test_notification_target_relationship_access(self):
+        """Test that accessing relationships through target causes additional queries"""
+        # Create notifications where each has a different notification as its target
+        for i in range(5):
+            # Create the target notification
+            target_notification = Notification.objects.create(
+                recipient=self.actor,
+                notification_type="target_notification",
+                subject=f"Target notification {i}",
+                text=f"Target text {i}",
+                channels=[WebsiteChannel.key],
+            )
+
+            # Create notification pointing to it
+            Notification.objects.create(
+                recipient=self.user,
+                actor=self.actor,
+                notification_type="test_notification",
+                subject=f"Test notification {i}",
+                text=f"This is test notification {i}",
+                channels=[WebsiteChannel.key],
+                target=target_notification,
+            )
+
+        # First, evaluate the queryset
+        with self.assertNumQueries(2):  # 1 for notifications + 1 for targets
+            notifications = get_notifications(self.user)
+            notifications_list = list(notifications)
+
+        # Test accessing target.recipient - this WILL cause N+1 queries
+        # because we didn't prefetch the target__recipient relationship
+        with self.assertNumQueries(5):  # 5 queries for recipient access
+            for notification in notifications_list:
+                if notification.target and hasattr(notification.target, "recipient"):
+                    _ = notification.target.recipient.email
+
+    def test_notification_target_relationship_preselect_access(self):
+        """Test that accessing relationships through target causes additional queries"""
+        # Create notifications where each has a different notification as its target
+        for i in range(5):
+            # Create the target notification
+            target_notification = Notification.objects.create(
+                recipient=self.actor,
+                notification_type="target_notification",
+                subject=f"Target notification {i}",
+                text=f"Target text {i}",
+                channels=[WebsiteChannel.key],
+            )
+
+            # Create notification pointing to it
+            Notification.objects.create(
+                recipient=self.user,
+                actor=self.actor,
+                notification_type="test_notification",
+                subject=f"Test notification {i}",
+                text=f"This is test notification {i}",
+                channels=[WebsiteChannel.key],
+                target=target_notification,
+            )
+
+        # First, evaluate the queryset
+        with self.assertNumQueries(3):  # 1 for notifications + 1 for targets + 1 for target recipients
+            notifications = get_notifications(self.user).prefetch_related("target__recipient")
+            notifications_list = list(notifications)
+
+        # Test accessing target.recipient - this won't cause N+1 queries
+        # because we now prefetch the target__recipient relationship
+        with self.assertNumQueries(0):
+            for notification in notifications_list:
+                if notification.target and hasattr(notification.target, "recipient"):
+                    _ = notification.target.recipient.email
