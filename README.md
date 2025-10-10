@@ -344,7 +344,7 @@ When displaying a list of 10 notifications, this will execute:
 
 #### Solution 1: store data in the notification
 
-The best approach is to store the needed data directly in the notification:
+The simplest approach is to store the needed data directly in the notification:
 
 ```python
 send_notification(
@@ -357,6 +357,8 @@ send_notification(
     url=article.get_absolute_url()
 )
 ```
+
+However, this only works if you don’t need to dynamically generate the text - for example to make sure the text is always up to date, or to deal with internationalization.
 
 #### Solution 2: prefetch deeper relationships
 
