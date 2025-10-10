@@ -23,6 +23,7 @@ class NotificationChannel(ABC):
 
     key: str
     name: str
+    supports_digest: bool = False
 
     @abstractmethod
     def process(self, notification: "Notification") -> None:
@@ -33,6 +34,30 @@ class NotificationChannel(ABC):
             notification: Notification instance to process
         """
         pass
+
+    def send_now(self, notification: "Notification") -> None:
+        """
+        Send a notification immediately through this channel.
+        Override in subclasses that support realtime delivery.
+
+        Args:
+            notification: Notification instance to send
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} does not support realtime sending")
+
+    def send_digest(
+        self, user: Any, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
+    ) -> None:
+        """
+        Send a digest to a specific user with specific notifications.
+        Override in subclasses that support digest delivery.
+
+        Args:
+            user: User instance
+            notifications: QuerySet of notifications to include in digest
+            frequency: The frequency for context
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} does not support digest sending")
 
 
 def register(cls: Type[NotificationChannel]) -> Type[NotificationChannel]:
@@ -82,6 +107,7 @@ class EmailChannel(NotificationChannel):
 
     key = "email"
     name = "Email"
+    supports_digest = True
 
     def process(self, notification: "Notification") -> None:
         """
@@ -96,9 +122,9 @@ class EmailChannel(NotificationChannel):
 
         # Send immediately if realtime, otherwise leave for digest
         if frequency_cls and frequency_cls.is_realtime:
-            self.send_email_now(notification)
+            self.send_now(notification)
 
-    def send_email_now(self, notification: "Notification") -> None:
+    def send_now(self, notification: "Notification") -> None:
         """
         Send an individual email notification immediately.
 
@@ -141,13 +167,11 @@ class EmailChannel(NotificationChannel):
                 if absolute_url:
                     text_message += f"\n{absolute_url}"
 
-            send_mail(
+            self._send_email(
+                recipient=notification.recipient.email,
                 subject=subject,
-                message=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[notification.recipient.email],
+                text_message=text_message,
                 html_message=html_message,
-                fail_silently=False,
             )
 
             # Mark as sent
@@ -158,9 +182,8 @@ class EmailChannel(NotificationChannel):
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to send email for notification {notification.id}: {e}")
 
-    @classmethod
-    def send_digest_emails(
-        cls, user: Any, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
+    def send_digest(
+        self, user: Any, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
     ):
         """
         Send a digest email to a specific user with specific notifications.
@@ -226,13 +249,11 @@ class EmailChannel(NotificationChannel):
                     message_lines.append(f"... and {notifications_count - 10} more")
                 text_message = "\n".join(message_lines)
 
-            send_mail(
+            self._send_email(
+                recipient=user.email,
                 subject=subject,
-                message=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
+                text_message=text_message,
                 html_message=html_message,
-                fail_silently=False,
             )
 
             # Mark all as sent
@@ -241,3 +262,23 @@ class EmailChannel(NotificationChannel):
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to send digest email for user {user.id}: {e}")
+
+    def _send_email(self, recipient: str, subject: str, text_message: str, html_message: str | None = None) -> None:
+        """
+        Actually send the email. This method can be overridden by subclasses
+        to use different email backends (e.g., Celery, different email services).
+
+        Args:
+            recipient: Email address of the recipient
+            subject: Email subject
+            text_message: Plain text email content
+            html_message: HTML email content (optional)
+        """
+        send_mail(
+            subject=subject,
+            message=text_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[recipient],
+            html_message=html_message,
+            fail_silently=False,
+        )
