@@ -18,7 +18,7 @@ class NotificationQuerySet(models.QuerySet):
 
     def prefetch(self):
         """Prefetch related objects"""
-        return self.select_related("recipient", "actor")
+        return self.select_related("recipient", "actor").prefetch_related("target")
 
     def for_channel(self, channel: type[NotificationChannel] = WebsiteChannel):
         """Filter notifications by channel"""
