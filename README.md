@@ -303,7 +303,9 @@ The `should_save` method is called before saving each notification. Return `Fals
 
 The `target` field is a GenericForeignKey that can point to any Django model instance. While convenient, accessing targets requires careful consideration for performance.
 
-**Target Prefetching**: This library requires Django 5.0+ and automatically includes `.prefetch_related("target")` when using the standard query methods. This efficiently fetches target objects, but only the direct targets - accessing relationships *through* the target will still cause additional queries.
+When using Django 5.0+, this library automatically includes `.prefetch_related("target")` when using the standard query methods. This efficiently fetches target objects, but only the *direct* targets - accessing relationships *through* the target will still cause additional queries. 
+
+*On Django 4.2, you'll need to manually deal with prefetching the `target` relationship.*
 
 Consider this problematic example that will cause N+1 queries:
 
@@ -337,7 +339,7 @@ class CommentNotificationType(NotificationType):
 When displaying a list of 10 notifications, this will execute:
 
 - 1 query for the notifications
-- 1 query for the target comments
+- 1 query for the target comments (Django 5.0+ only, automatically prefetched)
 - 10 queries for the articles (N+1 problem!)
 
 #### Solution 1: store data in the notification
@@ -361,7 +363,8 @@ send_notification(
 If you must access relationships through the target, you can prefetch them:
 
 ```python
-# The library already prefetches targets, but you need to add deeper relationships
+# On Django 5.0+ the library already prefetches targets, 
+# but you need to add deeper relationships yourself
 notifications = get_notifications(user).prefetch_related(
     "target__article"  # This prevents the N+1 problem
 )
