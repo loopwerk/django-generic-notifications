@@ -59,7 +59,7 @@ class NotificationPerformanceTest(TestCase):
                 _ = notification.id
 
     def test_notification_target_access_queries(self):
-        """Test queries when accessing notification.target without explicit prefetching"""
+        """Test queries when accessing notification.target in template"""
         # Create notifications with targets
         for i in range(5):
             Notification.objects.create(
@@ -113,7 +113,7 @@ class NotificationPerformanceTest(TestCase):
             notifications_list = list(notifications)
 
         # Test accessing target.recipient - this WILL cause N+1 queries
-        # because we didn't prefetch the recipient relationship on the target notifications
+        # because we didn't prefetch the target__recipient relationship
         with self.assertNumQueries(5):  # 5 queries for recipient access
             for notification in notifications_list:
                 if notification.target and hasattr(notification.target, "recipient"):
@@ -148,9 +148,9 @@ class NotificationPerformanceTest(TestCase):
             notifications = get_notifications(self.user).prefetch_related("target__recipient")
             notifications_list = list(notifications)
 
-        # Test accessing target.recipient - this WILL cause N+1 queries
-        # because we didn't prefetch the recipient relationship on the target notifications
-        with self.assertNumQueries(0):  # 5 queries for recipient access
+        # Test accessing target.recipient - this won't cause N+1 queries
+        # because we now prefetch the target__recipient relationship
+        with self.assertNumQueries(0):
             for notification in notifications_list:
                 if notification.target and hasattr(notification.target, "recipient"):
                     _ = notification.target.recipient.email
