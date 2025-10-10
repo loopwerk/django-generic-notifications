@@ -245,7 +245,7 @@ class EmailChannelTest(TestCase):
     def test_send_digest_emails_empty_queryset(self):
         # No notifications exist, so digest should not send anything
         empty_notifications = Notification.objects.none()
-        EmailChannel().send_digest(self.user, empty_notifications)
+        EmailChannel().send_digest(empty_notifications)
 
         # No email should be sent when no notifications exist
         self.assertEqual(len(mail.outbox), 0)
@@ -263,7 +263,7 @@ class EmailChannelTest(TestCase):
         notifications = Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
 
         # Send digest email for this user
-        EmailChannel().send_digest(self.user, notifications)
+        EmailChannel().send_digest(notifications)
 
         # Check email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -283,9 +283,7 @@ class EmailChannelTest(TestCase):
 
         Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
 
-        EmailChannel().send_digest(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Digest - 1 new notification")
@@ -297,9 +295,7 @@ class EmailChannelTest(TestCase):
 
         Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
 
-        EmailChannel().send_digest(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Digest - 1 new notification")
@@ -315,9 +311,7 @@ class EmailChannelTest(TestCase):
             for i in range(15)
         ]
 
-        EmailChannel().send_digest(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         # The implementation may not have this feature, so we'll just check that email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -334,9 +328,7 @@ class EmailChannelTest(TestCase):
 
         Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
 
-        EmailChannel().send_digest(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         # Check templates were rendered (subject, HTML, then text)
         self.assertEqual(mock_render.call_count, 3)
@@ -394,9 +386,7 @@ class EmailChannelTest(TestCase):
             url="https://example.com/url/2",
         )
 
-        EmailChannel().send_digest(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         # Check that one email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -439,7 +429,7 @@ class CustomEmailChannelTest(TestCase):
                 super().__init__()
                 self.sent_emails = []
 
-            def _send_email(
+            def send_email(
                 self, recipient: str, subject: str, text_message: str, html_message: str | None = None
             ) -> None:
                 """Override to track calls instead of actually sending."""
@@ -474,7 +464,7 @@ class CustomEmailChannelTest(TestCase):
 
         # Test the custom channel
         custom_channel = TestEmailChannel()
-        custom_channel.send_digest(self.user, notifications)
+        custom_channel.send_digest(notifications)
 
         # Verify the custom _send_email method was called
         self.assertEqual(len(custom_channel.sent_emails), 1)
@@ -508,7 +498,7 @@ class CustomEmailChannelTest(TestCase):
                 super().__init__()
                 self.queued_emails = []
 
-            def _send_email(
+            def send_email(
                 self, recipient: str, subject: str, text_message: str, html_message: str | None = None
             ) -> None:
                 """Queue email for later processing instead of sending immediately."""

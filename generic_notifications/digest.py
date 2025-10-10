@@ -113,7 +113,7 @@ def _send_digest_for_channel(
             )
 
             if not dry_run:
-                channel.send_digest(user, notifications, frequency_cls)
+                channel.send_digest(notifications, frequency_cls)
 
             digests_sent += 1
 

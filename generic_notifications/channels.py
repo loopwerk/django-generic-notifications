@@ -1,9 +1,9 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Type
+from typing import TYPE_CHECKING, Type
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import send_mail as django_send_mail
 from django.db.models import QuerySet
 from django.template.defaultfilters import pluralize
 from django.template.loader import render_to_string
@@ -46,15 +46,14 @@ class NotificationChannel(ABC):
         raise NotImplementedError(f"{self.__class__.__name__} does not support realtime sending")
 
     def send_digest(
-        self, user: Any, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
+        self, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
     ) -> None:
         """
-        Send a digest to a specific user with specific notifications.
+        Send a digest with specific notifications.
         Override in subclasses that support digest delivery.
 
         Args:
-            user: User instance
-            notifications: QuerySet of notifications to include in digest
+            notifications: QuerySet of notifications to include in digest (must all have same recipient)
             frequency: The frequency for context
         """
         raise NotImplementedError(f"{self.__class__.__name__} does not support digest sending")
@@ -167,7 +166,7 @@ class EmailChannel(NotificationChannel):
                 if absolute_url:
                     text_message += f"\n{absolute_url}"
 
-            self._send_email(
+            self.send_email(
                 recipient=notification.recipient.email,
                 subject=subject,
                 text_message=text_message,
@@ -183,19 +182,21 @@ class EmailChannel(NotificationChannel):
             logger.error(f"Failed to send email for notification {notification.id}: {e}")
 
     def send_digest(
-        self, user: Any, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
+        self, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
     ):
         """
-        Send a digest email to a specific user with specific notifications.
+        Send a digest email with specific notifications.
         This method is used by the management command.
 
         Args:
-            user: User instance
-            notifications: QuerySet of notifications to include in digest
+            notifications: QuerySet of notifications to include in digest (must all have same recipient)
             frequency: The frequency for template context
         """
         if not notifications.exists():
             return
+
+        # Get user from first notification (all have same recipient)
+        user = notifications.first().recipient
 
         try:
             # Group notifications by type for better digest formatting
@@ -249,7 +250,7 @@ class EmailChannel(NotificationChannel):
                     message_lines.append(f"... and {notifications_count - 10} more")
                 text_message = "\n".join(message_lines)
 
-            self._send_email(
+            self.send_email(
                 recipient=user.email,
                 subject=subject,
                 text_message=text_message,
@@ -263,7 +264,7 @@ class EmailChannel(NotificationChannel):
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to send digest email for user {user.id}: {e}")
 
-    def _send_email(self, recipient: str, subject: str, text_message: str, html_message: str | None = None) -> None:
+    def send_email(self, recipient: str, subject: str, text_message: str, html_message: str | None = None) -> None:
         """
         Actually send the email. This method can be overridden by subclasses
         to use different email backends (e.g., Celery, different email services).
@@ -274,7 +275,7 @@ class EmailChannel(NotificationChannel):
             text_message: Plain text email content
             html_message: HTML email content (optional)
         """
-        send_mail(
+        django_send_mail(
             subject=subject,
             message=text_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
