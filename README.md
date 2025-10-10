@@ -377,9 +377,7 @@ notifications = get_notifications(user).prefetch_related(
 - It won't work efficiently with heterogeneous targets (different model types)
 - Each additional relationship level requires explicit prefetching
 
-#### Recommended approach
-
-For best performance:
+#### For best performance
 
 1. If possible, store all display data directly in the notification (subject, text, url)
 2. If you need dynamic text, prefer accessing only direct fields on the target
