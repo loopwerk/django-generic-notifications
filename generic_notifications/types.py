@@ -1,8 +1,8 @@
 from abc import ABC
 from typing import TYPE_CHECKING, Any, Type
 
-from .channels import EmailChannel, NotificationChannel
-from .frequencies import DailyFrequency, NotificationFrequency, RealtimeFrequency
+from .channels import BaseChannel, EmailChannel
+from .frequencies import BaseFrequency, DailyFrequency, RealtimeFrequency
 from .registry import registry
 
 if TYPE_CHECKING:
@@ -17,8 +17,8 @@ class NotificationType(ABC):
     key: str
     name: str
     description: str
-    default_email_frequency: Type[NotificationFrequency] = DailyFrequency
-    required_channels: list[Type[NotificationChannel]] = []
+    default_frequency: Type[BaseFrequency] = DailyFrequency
+    required_channels: list[Type[BaseChannel]] = []
 
     def __str__(self) -> str:
         return self.name
@@ -51,53 +51,53 @@ class NotificationType(ABC):
         return ""
 
     @classmethod
-    def set_email_frequency(cls, user: Any, frequency: Type[NotificationFrequency]) -> None:
+    def set_frequency(cls, user: Any, frequency: Type[BaseFrequency]) -> None:
         """
-        Set the email frequency for this notification type for a user.
+        Set the delivery frequency for this notification type for a user.
 
         Args:
             user: The user to set the frequency for
-            frequency: NotificationFrequency class
+            frequency: BaseFrequency class
         """
-        from .models import EmailFrequency
+        from .models import NotificationFrequency
 
-        EmailFrequency.objects.update_or_create(
+        NotificationFrequency.objects.update_or_create(
             user=user, notification_type=cls.key, defaults={"frequency": frequency.key}
         )
 
     @classmethod
-    def get_email_frequency(cls, user: Any) -> Type[NotificationFrequency]:
+    def get_frequency(cls, user: Any) -> Type[BaseFrequency]:
         """
-        Get the email frequency for this notification type for a user.
+        Get the delivery frequency for this notification type for a user.
 
         Args:
             user: The user to get the frequency for
 
         Returns:
-            NotificationFrequency class (either user preference or default)
+            BaseFrequency class (either user preference or default)
         """
-        from .models import EmailFrequency
+        from .models import NotificationFrequency
 
         try:
-            user_frequency = EmailFrequency.objects.get(user=user, notification_type=cls.key)
+            user_frequency = NotificationFrequency.objects.get(user=user, notification_type=cls.key)
             return registry.get_frequency(user_frequency.frequency)
-        except EmailFrequency.DoesNotExist:
-            return cls.default_email_frequency
+        except NotificationFrequency.DoesNotExist:
+            return cls.default_frequency
 
     @classmethod
-    def reset_email_frequency_to_default(cls, user: Any) -> None:
+    def reset_frequency_to_default(cls, user: Any) -> None:
         """
-        Reset the email frequency to default for this notification type for a user.
+        Reset the delivery frequency to default for this notification type for a user.
 
         Args:
             user: The user to reset the frequency for
         """
-        from .models import EmailFrequency
+        from .models import NotificationFrequency
 
-        EmailFrequency.objects.filter(user=user, notification_type=cls.key).delete()
+        NotificationFrequency.objects.filter(user=user, notification_type=cls.key).delete()
 
     @classmethod
-    def get_enabled_channels(cls, user: Any) -> list[Type[NotificationChannel]]:
+    def get_enabled_channels(cls, user: Any) -> list[Type[BaseChannel]]:
         """
         Get all enabled channels for this notification type for a user.
         This is more efficient than calling is_channel_enabled for each channel individually.
@@ -106,7 +106,7 @@ class NotificationType(ABC):
             user: User instance
 
         Returns:
-            List of enabled NotificationChannel classes
+            List of enabled BaseChannel classes
         """
         from .models import DisabledNotificationTypeChannel
 
@@ -126,13 +126,13 @@ class NotificationType(ABC):
         return enabled_channels
 
     @classmethod
-    def is_channel_enabled(cls, user: Any, channel: Type[NotificationChannel]) -> bool:
+    def is_channel_enabled(cls, user: Any, channel: Type[BaseChannel]) -> bool:
         """
         Check if a channel is enabled for this notification type for a user.
 
         Args:
             user: User instance
-            channel: NotificationChannel class
+            channel: BaseChannel class
 
         Returns:
             True if channel is enabled, False if disabled
@@ -144,26 +144,26 @@ class NotificationType(ABC):
         ).exists()
 
     @classmethod
-    def disable_channel(cls, user: Any, channel: Type[NotificationChannel]) -> None:
+    def disable_channel(cls, user: Any, channel: Type[BaseChannel]) -> None:
         """
         Disable a channel for this notification type for a user.
 
         Args:
             user: User instance
-            channel: NotificationChannel class
+            channel: BaseChannel class
         """
         from .models import DisabledNotificationTypeChannel
 
         DisabledNotificationTypeChannel.objects.get_or_create(user=user, notification_type=cls.key, channel=channel.key)
 
     @classmethod
-    def enable_channel(cls, user: Any, channel: Type[NotificationChannel]) -> None:
+    def enable_channel(cls, user: Any, channel: Type[BaseChannel]) -> None:
         """
         Enable a channel for this notification type for a user.
 
         Args:
             user: User instance
-            channel: NotificationChannel class
+            channel: BaseChannel class
         """
         from .models import DisabledNotificationTypeChannel
 
@@ -198,7 +198,7 @@ class SystemMessage(NotificationType):
     key = "system_message"
     name = "System Message"
     description = "Important system notifications"
-    default_email_frequency = RealtimeFrequency
+    default_frequency = RealtimeFrequency
     required_channels = [EmailChannel]
 
     def get_subject(self, notification: "Notification") -> str:

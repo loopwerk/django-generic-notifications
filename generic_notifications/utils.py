@@ -3,7 +3,7 @@ from typing import Any
 from django.db.models import QuerySet
 from django.utils import timezone
 
-from .channels import NotificationChannel, WebsiteChannel
+from .channels import BaseChannel, WebsiteChannel
 
 
 def mark_notifications_as_read(user: Any, notification_ids: list[int] | None = None) -> None:
@@ -23,7 +23,7 @@ def mark_notifications_as_read(user: Any, notification_ids: list[int] | None = N
     queryset.update(read=timezone.now())
 
 
-def get_unread_count(user: Any, channel: type[NotificationChannel] = WebsiteChannel) -> int:
+def get_unread_count(user: Any, channel: type[BaseChannel] = WebsiteChannel) -> int:
     """
     Get count of unread notifications for a user, filtered by channel.
 
@@ -34,11 +34,11 @@ def get_unread_count(user: Any, channel: type[NotificationChannel] = WebsiteChan
     Returns:
         Count of unread notifications for the specified channel
     """
-    return user.notifications.filter(read__isnull=True, channels__icontains=f'"{channel.key}"').count()
+    return user.notifications.filter(read__isnull=True).for_channel(channel).count()
 
 
 def get_notifications(
-    user: Any, channel: type[NotificationChannel] = WebsiteChannel, unread_only: bool = False, limit: int | None = None
+    user: Any, channel: type[BaseChannel] = WebsiteChannel, unread_only: bool = False, limit: int | None = None
 ) -> QuerySet:
     """
     Get notifications for a user, filtered by channel.

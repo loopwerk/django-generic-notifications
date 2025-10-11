@@ -7,16 +7,15 @@ from django.core.mail import send_mail as django_send_mail
 from django.db.models import QuerySet
 from django.template.defaultfilters import pluralize
 from django.template.loader import render_to_string
-from django.utils import timezone
 
-from .frequencies import NotificationFrequency
+from .frequencies import BaseFrequency
 from .registry import registry
 
 if TYPE_CHECKING:
     from .models import Notification
 
 
-class NotificationChannel(ABC):
+class BaseChannel(ABC):
     """
     Base class for all notification channels.
     """
@@ -46,7 +45,7 @@ class NotificationChannel(ABC):
         raise NotImplementedError(f"{self.__class__.__name__} does not support realtime sending")
 
     def send_digest(
-        self, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
+        self, notifications: "QuerySet[Notification]", frequency: type[BaseFrequency] | None = None
     ) -> None:
         """
         Send a digest with specific notifications.
@@ -59,7 +58,7 @@ class NotificationChannel(ABC):
         raise NotImplementedError(f"{self.__class__.__name__} does not support digest sending")
 
 
-def register(cls: Type[NotificationChannel]) -> Type[NotificationChannel]:
+def register(cls: Type[BaseChannel]) -> Type[BaseChannel]:
     """
     Decorator that registers a NotificationChannel subclass.
 
@@ -80,7 +79,7 @@ def register(cls: Type[NotificationChannel]) -> Type[NotificationChannel]:
 
 
 @register
-class WebsiteChannel(NotificationChannel):
+class WebsiteChannel(BaseChannel):
     """
     Channel for displaying notifications on the website.
     Notifications are stored in the database and displayed in the UI.
@@ -98,7 +97,7 @@ class WebsiteChannel(NotificationChannel):
 
 
 @register
-class EmailChannel(NotificationChannel):
+class EmailChannel(BaseChannel):
     """
     Channel for sending notifications via email.
     Supports both realtime delivery and daily digest batching.
@@ -117,7 +116,7 @@ class EmailChannel(NotificationChannel):
         """
         # Get notification type class from key
         notification_type_cls = registry.get_type(notification.notification_type)
-        frequency_cls = notification_type_cls.get_email_frequency(notification.recipient)
+        frequency_cls = notification_type_cls.get_frequency(notification.recipient)
 
         # Send immediately if realtime, otherwise leave for digest
         if frequency_cls and frequency_cls.is_realtime:
@@ -174,16 +173,13 @@ class EmailChannel(NotificationChannel):
             )
 
             # Mark as sent
-            notification.email_sent_at = timezone.now()
-            notification.save(update_fields=["email_sent_at"])
+            notification.mark_sent_on_channel(self.__class__)
 
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to send email for notification {notification.id}: {e}")
 
-    def send_digest(
-        self, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
-    ):
+    def send_digest(self, notifications: "QuerySet[Notification]", frequency: type[BaseFrequency] | None = None):
         """
         Send a digest email with specific notifications.
         This method is used by the management command.
@@ -258,7 +254,8 @@ class EmailChannel(NotificationChannel):
             )
 
             # Mark all as sent
-            notifications.update(email_sent_at=timezone.now())
+            for notification in notifications:
+                notification.mark_sent_on_channel(self.__class__)
 
         except Exception as e:
             logger = logging.getLogger(__name__)

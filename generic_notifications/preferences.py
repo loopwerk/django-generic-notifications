@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 
 from django.contrib.auth.models import AbstractUser
 
-from .models import DisabledNotificationTypeChannel, EmailFrequency
+from .models import DisabledNotificationTypeChannel, NotificationFrequency
 from .registry import registry
 
 
@@ -27,7 +27,9 @@ def get_notification_preferences(user: "AbstractUser") -> List[Dict[str, Any]]:
     )
 
     # Get user's email frequency preferences
-    email_frequencies = dict(EmailFrequency.objects.filter(user=user).values_list("notification_type", "frequency"))
+    email_frequencies = dict(
+        NotificationFrequency.objects.filter(user=user).values_list("notification_type", "frequency")
+    )
 
     # Build settings data structure
     settings_data = []
@@ -36,7 +38,7 @@ def get_notification_preferences(user: "AbstractUser") -> List[Dict[str, Any]]:
         type_data: Dict[str, Any] = {
             "notification_type": notification_type,
             "channels": {},
-            "email_frequency": email_frequencies.get(type_key, notification_type.default_email_frequency.key),
+            "email_frequency": email_frequencies.get(type_key, notification_type.default_frequency.key),
         }
 
         for channel in channels.values():
@@ -68,7 +70,7 @@ def save_notification_preferences(user: "AbstractUser", form_data: Dict[str, Any
     """
     # Clear existing preferences to rebuild from form data
     DisabledNotificationTypeChannel.objects.filter(user=user).delete()
-    EmailFrequency.objects.filter(user=user).delete()
+    NotificationFrequency.objects.filter(user=user).delete()
 
     notification_types = {nt.key: nt for nt in registry.get_all_types()}
     channels = {ch.key: ch for ch in registry.get_all_channels()}
@@ -99,5 +101,5 @@ def save_notification_preferences(user: "AbstractUser", form_data: Dict[str, Any
                 if frequency_value in frequencies:
                     frequency_obj = frequencies[frequency_value]
                     # Only save if different from default
-                    if frequency_value != notification_type.default_email_frequency.key:
-                        notification_type.set_email_frequency(user=user, frequency=frequency_obj)
+                    if frequency_value != notification_type.default_frequency.key:
+                        notification_type.set_frequency(user=user, frequency=frequency_obj)

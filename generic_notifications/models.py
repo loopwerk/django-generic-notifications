@@ -3,12 +3,11 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-from .channels import NotificationChannel, WebsiteChannel
+from .channels import BaseChannel, WebsiteChannel
 from .registry import registry
 
 User = get_user_model()
@@ -27,9 +26,9 @@ class NotificationQuerySet(models.QuerySet):
 
         return qs
 
-    def for_channel(self, channel: type[NotificationChannel] = WebsiteChannel):
+    def for_channel(self, channel: type[BaseChannel] = WebsiteChannel):
         """Filter notifications by channel"""
-        return self.filter(channels__icontains=f'"{channel.key}"')
+        return self.filter(channels__channel=channel.key)
 
     def unread(self):
         """Filter only unread notifications"""
@@ -83,13 +82,14 @@ class DisabledNotificationTypeChannel(models.Model):
         return f"{self.user} disabled {self.notification_type} on {self.channel}"
 
 
-class EmailFrequency(models.Model):
+class NotificationFrequency(models.Model):
     """
-    Email delivery frequency preference per notification type.
-    Default is `NotificationType.default_email_frequency` if no row exists.
+    Delivery frequency preference per notification type.
+    This applies to all channels that support the chosen frequency.
+    Default is `NotificationType.default_frequency` if no row exists.
     """
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="email_frequencies")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notification_frequencies")
     notification_type = models.CharField(max_length=50)
     frequency = models.CharField(max_length=20)
 
@@ -129,6 +129,27 @@ class EmailFrequency(models.Model):
         return f"{self.user} - {self.notification_type}: {self.frequency}"
 
 
+class NotificationChannel(models.Model):
+    """
+    Tracks which channels a notification should be sent through and their delivery status.
+    """
+
+    notification = models.ForeignKey("Notification", on_delete=models.CASCADE, related_name="channels")
+    channel = models.CharField(max_length=20)  # e.g., 'email', 'website', etc.
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ["notification", "channel"]
+        indexes = [
+            models.Index(fields=["notification", "channel", "sent_at"]),
+            models.Index(fields=["channel", "sent_at"]),  # For digest queries
+        ]
+
+    def __str__(self):
+        status = "sent" if self.sent_at else "pending"
+        return f"{self.notification} - {self.channel} ({status})"
+
+
 class Notification(models.Model):
     """
     A specific notification instance for a user
@@ -153,12 +174,6 @@ class Notification(models.Model):
     object_id = models.PositiveIntegerField(null=True, blank=True)
     target = GenericForeignKey("content_type", "object_id")
 
-    # Email tracking
-    email_sent_at = models.DateTimeField(null=True, blank=True)
-
-    # Channels this notification is enabled for
-    channels = models.JSONField(default=list, blank=True)
-
     # Flexible metadata for any extra data
     metadata = models.JSONField(default=dict, blank=True)
 
@@ -166,12 +181,8 @@ class Notification(models.Model):
 
     class Meta:
         indexes = [
-            GinIndex(fields=["channels"], name="notification_channels_gin"),
-            models.Index(fields=["recipient", "read", "channels"], name="notification_unread_channel"),
-            models.Index(fields=["recipient", "channels"], name="notification_recipient_channel"),
-            models.Index(
-                fields=["recipient", "email_sent_at", "read", "channels"], name="notification_user_email_digest"
-            ),
+            models.Index(fields=["recipient", "read"], name="notification_unread_idx"),
+            models.Index(fields=["recipient", "added"], name="notification_recipient_idx"),
         ]
         ordering = ["-added"]
 
@@ -230,6 +241,18 @@ class Notification(models.Model):
             return notification_type.get_text(self)
         except KeyError:
             return "You have a new notification"
+
+    def get_channels(self) -> list[str]:
+        """Get all channels this notification is configured for."""
+        return list(self.channels.values_list("channel", flat=True))
+
+    def is_sent_on_channel(self, channel: type["BaseChannel"]) -> bool:
+        """Check if notification was sent on a specific channel."""
+        return self.channels.filter(channel=channel.key, sent_at__isnull=False).exists()
+
+    def mark_sent_on_channel(self, channel: type["BaseChannel"]) -> None:
+        """Mark notification as sent on a specific channel."""
+        self.channels.filter(channel=channel.key).update(sent_at=timezone.now())
 
     @property
     def is_read(self) -> bool:

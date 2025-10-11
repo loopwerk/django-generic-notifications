@@ -4,7 +4,7 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 
-from .frequencies import NotificationFrequency
+from .frequencies import BaseFrequency
 from .models import Notification
 from .registry import registry
 from .types import NotificationType
@@ -64,7 +64,7 @@ def send_digest_notifications(frequency_key: str, dry_run: bool = False) -> int:
 
 def _send_digest_for_channel(
     channel: Any,
-    frequency_cls: type[NotificationFrequency],
+    frequency_cls: type[BaseFrequency],
     all_notification_types: list[type[NotificationType]],
     dry_run: bool,
 ) -> int:
@@ -82,9 +82,9 @@ def _send_digest_for_channel(
     """
     # Find all users who have unsent, unread notifications for this channel
     users_with_notifications = User.objects.filter(
-        notifications__email_sent_at__isnull=True,  # TODO: This should be channel-agnostic
         notifications__read__isnull=True,
-        notifications__channels__icontains=f'"{channel.key}"',
+        notifications__channels__channel=channel.key,
+        notifications__channels__sent_at__isnull=True,
     ).distinct()
 
     digests_sent = 0
@@ -102,9 +102,9 @@ def _send_digest_for_channel(
         notifications = Notification.objects.filter(
             recipient=user,
             notification_type__in=relevant_type_keys,
-            email_sent_at__isnull=True,  # TODO: This should be channel-agnostic
             read__isnull=True,
-            channels__icontains=f'"{channel.key}"',
+            channels__channel=channel.key,
+            channels__sent_at__isnull=True,
         ).order_by("-added")
 
         if notifications.exists():
@@ -128,7 +128,7 @@ def _send_digest_for_channel(
 
 def _get_notification_types_for_frequency(
     user: AbstractUser,
-    wanted_frequency: type[NotificationFrequency],
+    wanted_frequency: type[BaseFrequency],
     all_notification_types: list[type[NotificationType]],
 ) -> list[type[NotificationType]]:
     """
@@ -147,7 +147,7 @@ def _get_notification_types_for_frequency(
     relevant_types: list[type[NotificationType]] = []
 
     for notification_type in all_notification_types:
-        user_frequency = notification_type.get_email_frequency(user)  # TODO: This should be channel-agnostic
+        user_frequency = notification_type.get_frequency(user)
         if user_frequency.key == wanted_frequency.key:
             relevant_types.append(notification_type)
 

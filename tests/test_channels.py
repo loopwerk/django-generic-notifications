@@ -5,11 +5,13 @@ from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase, override_settings
 
-from generic_notifications.channels import EmailChannel, NotificationChannel
+from generic_notifications.channels import BaseChannel, EmailChannel
 from generic_notifications.frequencies import RealtimeFrequency
-from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency, Notification
+from generic_notifications.models import DisabledNotificationTypeChannel, Notification, NotificationFrequency
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
+
+from .test_helpers import create_notification_with_channels
 
 User = get_user_model()
 
@@ -19,7 +21,7 @@ class TestNotificationType(NotificationType):
     key = "test_type"
     name = "Test Type"
     description = "A test notification type"
-    default_email_frequency = RealtimeFrequency
+    default_frequency = RealtimeFrequency
 
 
 class NotificationChannelTest(TestCase):
@@ -31,7 +33,7 @@ class NotificationChannelTest(TestCase):
         cls.user = User.objects.create_user(username="user1", email="test@example.com", password="testpass")
 
     def test_notification_channel_is_abstract(self):
-        class TestChannel(NotificationChannel):
+        class TestChannel(BaseChannel):
             key = "test"
             name = "Test"
 
@@ -43,7 +45,7 @@ class NotificationChannelTest(TestCase):
         self.assertEqual(channel.name, "Test")
 
     def test_is_enabled_default_true(self):
-        class TestChannel(NotificationChannel):
+        class TestChannel(BaseChannel):
             key = "test"
             name = "Test"
 
@@ -54,7 +56,7 @@ class NotificationChannelTest(TestCase):
         self.assertTrue(TestNotificationType.is_channel_enabled(self.user, TestChannel))
 
     def test_is_enabled_with_disabled_notification(self):
-        class TestChannel(NotificationChannel):
+        class TestChannel(BaseChannel):
             key = "test"
             name = "Test"
 
@@ -106,8 +108,8 @@ class EmailChannelTest(TestCase):
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_process_realtime_frequency(self):
-        notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", channels=["website", "email"]
+        notification = create_notification_with_channels(
+            user=self.user, channels=["website", "email"], notification_type="test_type"
         )
 
         channel = EmailChannel()
@@ -120,14 +122,14 @@ class EmailChannelTest(TestCase):
 
         # Check notification was marked as sent
         notification.refresh_from_db()
-        self.assertIsNotNone(notification.email_sent_at)
+        self.assertTrue(notification.is_sent_on_channel(EmailChannel))
 
     def test_process_digest_frequency(self):
         # Set user preference to daily (non-realtime)
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        NotificationFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
 
-        notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", channels=["website", "email"]
+        notification = create_notification_with_channels(
+            user=self.user, channels=["website", "email"], notification_type="test_type"
         )
 
         channel = EmailChannel()
@@ -138,12 +140,16 @@ class EmailChannelTest(TestCase):
 
         # Notification should not be marked as sent
         notification.refresh_from_db()
-        self.assertIsNone(notification.email_sent_at)
+        self.assertFalse(notification.is_sent_on_channel(EmailChannel))
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_now_basic(self):
-        notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", subject="Test Subject", text="Test message"
+        notification = create_notification_with_channels(
+            user=self.user,
+            notification_type="test_type",
+            subject="Test Subject",
+            text="Test message",
+            channels=["email"],
         )
 
         channel = EmailChannel()
@@ -159,12 +165,14 @@ class EmailChannelTest(TestCase):
 
         # Check notification was marked as sent
         notification.refresh_from_db()
-        self.assertIsNotNone(notification.email_sent_at)
+        self.assertTrue(notification.is_sent_on_channel(EmailChannel))
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_now_uses_get_methods(self):
         # Create notification without stored subject/text to test dynamic generation
-        notification = Notification.objects.create(recipient=self.user, notification_type="test_type")
+        notification = create_notification_with_channels(
+            user=self.user, notification_type="test_type", channels=["email"]
+        )
 
         channel = EmailChannel()
         channel.send_now(notification)
@@ -192,8 +200,12 @@ class EmailChannelTest(TestCase):
 
         mock_render.side_effect = mock_render_side_effect
 
-        notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", subject="Test Subject", text="Test message"
+        notification = create_notification_with_channels(
+            user=self.user,
+            notification_type="test_type",
+            subject="Test Subject",
+            text="Test message",
+            channels=["email"],
         )
 
         channel = EmailChannel()
@@ -228,8 +240,8 @@ class EmailChannelTest(TestCase):
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_now_template_error_fallback(self):
-        notification = Notification.objects.create(
-            recipient=self.user, notification_type="test_type", subject="Test Subject"
+        notification = create_notification_with_channels(
+            user=self.user, notification_type="test_type", subject="Test Subject", channels=["email"]
         )
 
         channel = EmailChannel()
@@ -253,14 +265,18 @@ class EmailChannelTest(TestCase):
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_basic(self):
         # Set user to daily frequency to prevent realtime sending
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        NotificationFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
 
         # Create test notifications without email_sent_at (unsent)
         for i in range(3):
-            Notification.objects.create(recipient=self.user, notification_type="test_type", subject=f"Test {i}")
+            create_notification_with_channels(
+                user=self.user, notification_type="test_type", subject=f"Test {i}", channels=["email"]
+            )
 
         # Get notifications as queryset
-        notifications = Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
+        notifications = Notification.objects.filter(
+            recipient=self.user, channels__channel="email", channels__sent_at__isnull=True
+        )
 
         # Send digest email for this user
         EmailChannel().send_digest(notifications)
@@ -274,16 +290,20 @@ class EmailChannelTest(TestCase):
         # Check all notifications marked as sent
         for notification in notifications:
             notification.refresh_from_db()
-            self.assertIsNotNone(notification.email_sent_at)
+            self.assertTrue(notification.is_sent_on_channel(EmailChannel))
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_with_frequency(self):
         # Set user to daily frequency to prevent realtime sending
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        NotificationFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
 
-        Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
+        create_notification_with_channels(
+            user=self.user, notification_type="test_type", subject="Test", channels=["email"]
+        )
 
-        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
+        EmailChannel().send_digest(
+            Notification.objects.filter(recipient=self.user, channels__channel="email", channels__sent_at__isnull=True)
+        )
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Digest - 1 new notification")
@@ -291,11 +311,15 @@ class EmailChannelTest(TestCase):
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_without_frequency(self):
         # Set user to daily frequency to prevent realtime sending
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        NotificationFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
 
-        Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
+        create_notification_with_channels(
+            user=self.user, notification_type="test_type", subject="Test", channels=["email"]
+        )
 
-        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
+        EmailChannel().send_digest(
+            Notification.objects.filter(recipient=self.user, channels__channel="email", channels__sent_at__isnull=True)
+        )
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Digest - 1 new notification")
@@ -303,15 +327,17 @@ class EmailChannelTest(TestCase):
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_text_limit(self):
         # Set user to daily frequency to prevent realtime sending
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        NotificationFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
 
         # Create more than 10 notifications to test text limit
-        _ = [
-            Notification.objects.create(recipient=self.user, notification_type="test_type", subject=f"Test {i}")
-            for i in range(15)
-        ]
+        for i in range(15):
+            create_notification_with_channels(
+                user=self.user, notification_type="test_type", subject=f"Test {i}", channels=["email"]
+            )
 
-        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
+        EmailChannel().send_digest(
+            Notification.objects.filter(recipient=self.user, channels__channel="email", channels__sent_at__isnull=True)
+        )
 
         # The implementation may not have this feature, so we'll just check that email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -324,11 +350,15 @@ class EmailChannelTest(TestCase):
         mock_render.return_value = "<html>Digest HTML</html>"
 
         # Set user to daily frequency to prevent realtime sending
-        EmailFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        NotificationFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
 
-        Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
+        create_notification_with_channels(
+            user=self.user, notification_type="test_type", subject="Test", channels=["email"]
+        )
 
-        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
+        EmailChannel().send_digest(
+            Notification.objects.filter(recipient=self.user, channels__channel="email", channels__sent_at__isnull=True)
+        )
 
         # Check templates were rendered (subject, HTML, then text)
         self.assertEqual(mock_render.call_count, 3)
@@ -349,10 +379,10 @@ class EmailChannelTest(TestCase):
 
     def test_send_now_fallback_includes_url(self):
         """Test that fallback email content includes URL when available"""
-        notification = Notification.objects.create(
-            recipient=self.user,
-            notification_type=TestNotificationType.key,
+        notification = create_notification_with_channels(
+            user=self.user,
             channels=["email"],
+            notification_type=TestNotificationType.key,
             subject="Test Subject",
             text="Test notification text",
             url="https://example.com/test/url/123",
@@ -371,22 +401,24 @@ class EmailChannelTest(TestCase):
     def test_send_digest_emails_fallback_includes_urls(self):
         """Test that digest fallback email content includes URLs when available"""
         # Create notifications with URLs
-        Notification.objects.create(
-            recipient=self.user,
-            notification_type=TestNotificationType.key,
+        create_notification_with_channels(
+            user=self.user,
             channels=["email"],
+            notification_type=TestNotificationType.key,
             text="First notification",
             url="https://example.com/url/1",
         )
-        Notification.objects.create(
-            recipient=self.user,
-            notification_type=TestNotificationType.key,
+        create_notification_with_channels(
+            user=self.user,
             channels=["email"],
+            notification_type=TestNotificationType.key,
             text="Second notification",
             url="https://example.com/url/2",
         )
 
-        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
+        EmailChannel().send_digest(
+            Notification.objects.filter(recipient=self.user, channels__channel="email", channels__sent_at__isnull=True)
+        )
 
         # Check that one email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -444,18 +476,18 @@ class CustomEmailChannelTest(TestCase):
                 # Don't call super() - we don't want to actually send emails
 
         # Create notifications
-        notification1 = Notification.objects.create(
-            recipient=self.user,
-            notification_type=TestNotificationType.key,
+        notification1 = create_notification_with_channels(
+            user=self.user,
             channels=["test_email"],
+            notification_type=TestNotificationType.key,
             subject="Test Subject 1",
             text="Test notification 1",
         )
 
-        notification2 = Notification.objects.create(
-            recipient=self.user,
-            notification_type=TestNotificationType.key,
+        notification2 = create_notification_with_channels(
+            user=self.user,
             channels=["test_email"],
+            notification_type=TestNotificationType.key,
             subject="Test Subject 2",
             text="Test notification 2",
         )
@@ -482,8 +514,8 @@ class CustomEmailChannelTest(TestCase):
         # Check that notifications were marked as sent
         notification1.refresh_from_db()
         notification2.refresh_from_db()
-        self.assertIsNotNone(notification1.email_sent_at)
-        self.assertIsNotNone(notification2.email_sent_at)
+        self.assertTrue(notification1.is_sent_on_channel(TestEmailChannel))
+        self.assertTrue(notification2.is_sent_on_channel(TestEmailChannel))
 
     def test_custom_email_channel_send_now_override(self):
         """Test that a custom EmailChannel subclass works with send_now."""
@@ -513,10 +545,10 @@ class CustomEmailChannelTest(TestCase):
                 )
 
         # Create notification
-        notification = Notification.objects.create(
-            recipient=self.user,
-            notification_type=TestNotificationType.key,
+        notification = create_notification_with_channels(
+            user=self.user,
             channels=["async_email"],
+            notification_type=TestNotificationType.key,
             subject="Realtime Test",
             text="Realtime notification",
         )
@@ -539,4 +571,4 @@ class CustomEmailChannelTest(TestCase):
 
         # Check that notification was marked as sent
         notification.refresh_from_db()
-        self.assertIsNotNone(notification.email_sent_at)
+        self.assertTrue(notification.is_sent_on_channel(AsyncEmailChannel))
