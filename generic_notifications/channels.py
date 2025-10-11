@@ -1,5 +1,5 @@
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import TYPE_CHECKING, Type
 
 from django.conf import settings
@@ -24,15 +24,26 @@ class BaseChannel(ABC):
     name: str
     supports_digest: bool = False
 
-    @abstractmethod
     def process(self, notification: "Notification") -> None:
         """
         Process a notification through this channel.
+        For digest-supporting channels, this checks frequency preference.
+        For non-digest channels, this sends immediately.
 
         Args:
             notification: Notification instance to process
         """
-        pass
+        if self.supports_digest:
+            # Get notification type class from key
+            notification_type_cls = registry.get_type(notification.notification_type)
+            frequency_cls = notification_type_cls.get_frequency(notification.recipient)
+
+            # Send immediately if realtime, otherwise leave for digest
+            if frequency_cls and frequency_cls.is_realtime:
+                self.send_now(notification)
+        else:
+            # Non-digest channels always send immediately
+            self.send_now(notification)
 
     def send_now(self, notification: "Notification") -> None:
         """
@@ -88,10 +99,9 @@ class WebsiteChannel(BaseChannel):
     key = "website"
     name = "Website"
 
-    def process(self, notification: "Notification") -> None:
+    def send_now(self, notification: "Notification") -> None:
         """
         Website notifications are just stored in DB - no additional processing needed.
-        The notification was already created before channels are processed.
         """
         pass
 
@@ -106,21 +116,6 @@ class EmailChannel(BaseChannel):
     key = "email"
     name = "Email"
     supports_digest = True
-
-    def process(self, notification: "Notification") -> None:
-        """
-        Process email notification based on user's frequency preference.
-
-        Args:
-            notification: Notification instance to process
-        """
-        # Get notification type class from key
-        notification_type_cls = registry.get_type(notification.notification_type)
-        frequency_cls = notification_type_cls.get_frequency(notification.recipient)
-
-        # Send immediately if realtime, otherwise leave for digest
-        if frequency_cls and frequency_cls.is_realtime:
-            self.send_now(notification)
 
     def send_now(self, notification: "Notification") -> None:
         """

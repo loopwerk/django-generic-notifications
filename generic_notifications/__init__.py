@@ -38,7 +38,7 @@ def send_notification(
     Raises:
         ValueError: If notification_type is not registered
     """
-    from .models import Notification
+    from .models import Notification, NotificationChannel
     from .registry import registry
 
     # Validate notification type is registered
@@ -81,8 +81,6 @@ def send_notification(
             notification.save()
 
             # Create NotificationChannel entries for each enabled channel
-            from .models import NotificationChannel
-
             for channel_cls in enabled_channel_classes:
                 NotificationChannel.objects.create(
                     notification=notification,
