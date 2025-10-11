@@ -87,7 +87,6 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Test notification",
             text="This is a test notification",
-            channels=["email"],
         )
 
         # No emails should be in outbox initially
@@ -113,7 +112,9 @@ class SendDigestEmailsCommandTest(TestCase):
         NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="daily")
 
         notification = create_notification_with_channels(
-            user=self.user1, notification_type="test_type", subject="Test notification", channels=["email"]
+            user=self.user1,
+            notification_type="test_type",
+            subject="Test notification",
         )
 
         # Ensure no emails in outbox initially
@@ -138,7 +139,6 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Read notification subject",
             text="Read notification text",
-            channels=["email"],
         )
         read_notification.mark_as_read()
 
@@ -147,7 +147,6 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Unread notification subject",
             text="Unread notification text",
-            channels=["email"],
         )
 
         call_command("send_notification_digests", "--frequency", "daily")
@@ -172,7 +171,6 @@ class SendDigestEmailsCommandTest(TestCase):
             user=self.user1,
             notification_type="test_type",
             subject="Sent notification",
-            channels=["email"],
         )
         # Mark as sent
         sent_notification.mark_sent_on_channel(EmailChannel)
@@ -182,7 +180,6 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Unsent notification subject",
             text="Unsent notification text",
-            channels=["email"],
         )
 
         call_command("send_notification_digests", "--frequency", "daily")
@@ -206,7 +203,6 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Old notification subject",
             text="Old notification text",
-            channels=["email"],
         )
         # Manually set old timestamp
         old_time = timezone.now() - timedelta(days=2)
@@ -218,7 +214,6 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Recent notification subject",
             text="Recent notification text",
-            channels=["email"],
         )
 
         call_command("send_notification_digests", "--frequency", "daily")
@@ -249,14 +244,12 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Daily user notification subject",
             text="Daily user notification text",
-            channels=["email"],
         )
         create_notification_with_channels(
             user=self.user2,
             notification_type="test_type",
             subject="Weekly user notification subject",
             text="Weekly user notification text",
-            channels=["email"],
         )
 
         call_command("send_notification_digests", "--frequency", "daily")
@@ -288,14 +281,12 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Test type notification subject",
             text="Test type notification text",
-            channels=["email"],
         )
         notification2 = create_notification_with_channels(
             user=self.user1,
             notification_type="other_type",
             subject="Other type notification subject",
             text="Other type notification text",
-            channels=["email"],
         )
 
         call_command("send_notification_digests", "--frequency", "daily")
@@ -331,7 +322,10 @@ class SendDigestEmailsCommandTest(TestCase):
         # With the new architecture, if email is disabled, notifications won't have email channel
         # So create a notification without email channel to simulate this
         create_notification_with_channels(
-            user=self.user1, notification_type="test_type", subject="Test notification", channels=["website"]
+            user=self.user1,
+            notification_type="test_type",
+            subject="Test notification",
+            channels=["website"],
         )
 
         # Run daily digest - should not send anything (no email channel)
@@ -348,7 +342,6 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Test notification",
             text="This is a test notification",
-            channels=["email"],
         )
 
         # Create an other_type notification (defaults to realtime)
@@ -357,7 +350,6 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="other_type",
             subject="Other notification",
             text="This is another type of notification",
-            channels=["email"],
         )
 
         # Run daily digest - should include comment but not system message
@@ -387,14 +379,12 @@ class SendDigestEmailsCommandTest(TestCase):
             notification_type="test_type",
             subject="Test notification subject",
             text="Test notification text",
-            channels=["email"],
         )
         create_notification_with_channels(
             user=self.user1,
             notification_type="other_type",
             subject="Other notification subject",
             text="Other notification text",
-            channels=["email"],
         )
 
         # Run daily digest - should get nothing (test_type is weekly, other_type is realtime)
@@ -423,7 +413,6 @@ class SendDigestEmailsCommandTest(TestCase):
                 notification_type="test_type",
                 subject=f"Test notification for user {i} subject",
                 text=f"Test notification for user {i} text",
-                channels=["email"],
             )
 
         # Run daily digest - should get user1 and user3 (both have test_type=daily)

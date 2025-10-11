@@ -114,7 +114,6 @@ class EmailChannelTest(TestCase):
     def test_process_realtime_frequency(self):
         notification = create_notification_with_channels(
             user=self.user,
-            channels=["website", "email"],
             notification_type="test_type",
         )
 
@@ -136,7 +135,6 @@ class EmailChannelTest(TestCase):
 
         notification = create_notification_with_channels(
             user=self.user,
-            channels=["website", "email"],
             notification_type="test_type",
         )
 
@@ -157,7 +155,6 @@ class EmailChannelTest(TestCase):
             notification_type="test_type",
             subject="Test Subject",
             text="Test message",
-            channels=["email"],
         )
 
         channel = EmailChannel()
@@ -178,11 +175,7 @@ class EmailChannelTest(TestCase):
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_now_uses_get_methods(self):
         # Create notification without stored subject/text to test dynamic generation
-        notification = create_notification_with_channels(
-            user=self.user,
-            notification_type="test_type",
-            channels=["email"],
-        )
+        notification = create_notification_with_channels(user=self.user, notification_type="test_type")
 
         channel = EmailChannel()
         channel.send_now(notification)

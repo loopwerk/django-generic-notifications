@@ -186,7 +186,8 @@ class MarkNotificationsAsReadTest(TestCase):
     def test_mark_notifications_other_user_not_affected(self):
         other_user = User.objects.create_user(username="other", email="other@example.com", password="testpass")
         other_notification = create_notification_with_channels(
-            user=other_user, notification_type="test_type", channels=["website", "email"]
+            user=other_user,
+            notification_type="test_type",
         )
 
         mark_notifications_as_read(self.user)
@@ -207,22 +208,18 @@ class GetUnreadCountTest(TestCase):
 
     def test_get_unread_count_with_unread_notifications(self):
         # Create unread notifications
-        create_notification_with_channels(user=self.user, notification_type="test_type", channels=["website"])
-        create_notification_with_channels(user=self.user, notification_type="test_type", channels=["website"])
-        create_notification_with_channels(user=self.user, notification_type="test_type", channels=["website"])
+        create_notification_with_channels(user=self.user, notification_type="test_type")
+        create_notification_with_channels(user=self.user, notification_type="test_type")
+        create_notification_with_channels(user=self.user, notification_type="test_type")
 
         count = get_unread_count(self.user, channel=WebsiteChannel)
         self.assertEqual(count, 3)
 
     def test_get_unread_count_with_mix_of_read_unread(self):
         # Create mix of read and unread
-        notification1 = create_notification_with_channels(
-            user=self.user, notification_type="test_type", channels=["website"]
-        )
-        create_notification_with_channels(user=self.user, notification_type="test_type", channels=["website"])
-        notification3 = create_notification_with_channels(
-            user=self.user, notification_type="test_type", channels=["website"]
-        )
+        notification1 = create_notification_with_channels(user=self.user, notification_type="test_type")
+        create_notification_with_channels(user=self.user, notification_type="test_type")
+        notification3 = create_notification_with_channels(user=self.user, notification_type="test_type")
 
         # Mark some as read
         notification1.mark_as_read()
@@ -235,8 +232,8 @@ class GetUnreadCountTest(TestCase):
         other_user = User.objects.create_user(username="other", email="other@example.com", password="testpass")
 
         # Create notifications for both users
-        create_notification_with_channels(user=self.user, notification_type="test_type", channels=["website"])
-        create_notification_with_channels(user=other_user, notification_type="test_type", channels=["website", "email"])
+        create_notification_with_channels(user=self.user, notification_type="test_type")
+        create_notification_with_channels(user=other_user, notification_type="test_type")
 
         count = get_unread_count(self.user, channel=WebsiteChannel)
         self.assertEqual(count, 1)
@@ -250,13 +247,19 @@ class GetNotificationsForUserTest(TestCase):
 
         # Create test notifications
         self.notification1 = create_notification_with_channels(
-            user=self.user, notification_type="test_type", subject="Test 1", channels=["website", "email"]
+            user=self.user,
+            notification_type="test_type",
+            subject="Test 1",
         )
         self.notification2 = create_notification_with_channels(
-            user=self.user, notification_type="other_type", subject="Other 1", channels=["website", "email"]
+            user=self.user,
+            notification_type="other_type",
+            subject="Other 1",
         )
         self.notification3 = create_notification_with_channels(
-            user=self.user, notification_type="test_type", subject="Test 2", channels=["website", "email"]
+            user=self.user,
+            notification_type="test_type",
+            subject="Test 2",
         )
 
         # Mark one as read
@@ -287,7 +290,7 @@ class GetNotificationsForUserTest(TestCase):
 
     def test_get_notifications_other_user_not_included(self):
         other_user = User.objects.create_user(username="other", email="other@example.com", password="testpass")
-        create_notification_with_channels(user=other_user, notification_type="test_type", channels=["website", "email"])
+        create_notification_with_channels(user=other_user, notification_type="test_type")
 
         notifications = get_notifications(self.user, channel=WebsiteChannel)
 

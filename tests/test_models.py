@@ -51,7 +51,9 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
 
     def test_create_disabled_notification(self):
         disabled = DisabledNotificationTypeChannel.objects.create(
-            user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
+            user=self.user,
+            notification_type=TestNotificationType.key,
+            channel=WebsiteChannel.key,
         )
 
         self.assertEqual(disabled.user, self.user)
@@ -60,7 +62,9 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
 
     def test_clean_with_invalid_notification_type(self):
         disabled = DisabledNotificationTypeChannel(
-            user=self.user, notification_type="invalid_type", channel=WebsiteChannel.key
+            user=self.user,
+            notification_type="invalid_type",
+            channel=WebsiteChannel.key,
         )
 
         with self.assertRaises(ValidationError) as cm:
@@ -70,7 +74,9 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
 
     def test_clean_with_invalid_channel(self):
         disabled = DisabledNotificationTypeChannel(
-            user=self.user, notification_type=TestNotificationType.key, channel="invalid_channel"
+            user=self.user,
+            notification_type=TestNotificationType.key,
+            channel="invalid_channel",
         )
 
         with self.assertRaises(ValidationError) as cm:
@@ -80,7 +86,9 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
 
     def test_clean_with_valid_data(self):
         disabled = DisabledNotificationTypeChannel(
-            user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
+            user=self.user,
+            notification_type=TestNotificationType.key,
+            channel=WebsiteChannel.key,
         )
 
         # Should not raise any exception
@@ -89,7 +97,9 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
     def test_clean_prevents_disabling_required_channel(self):
         """Test that users cannot disable required channels for notification types"""
         disabled = DisabledNotificationTypeChannel(
-            user=self.user, notification_type=SystemMessage.key, channel=EmailChannel.key
+            user=self.user,
+            notification_type=SystemMessage.key,
+            channel=EmailChannel.key,
         )
 
         with self.assertRaises(ValidationError) as cm:
@@ -100,7 +110,9 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
     def test_clean_allows_disabling_non_required_channel(self):
         """Test that users can disable non-required channels for notification types with required channels"""
         disabled = DisabledNotificationTypeChannel(
-            user=self.user, notification_type=SystemMessage.key, channel=WebsiteChannel.key
+            user=self.user,
+            notification_type=SystemMessage.key,
+            channel=WebsiteChannel.key,
         )
 
         # Should not raise any exception - website is not required for system_message
@@ -122,7 +134,9 @@ class NotificationFrequencyModelTest(TestCase):
 
     def test_create_email_frequency(self):
         frequency = NotificationFrequency.objects.create(
-            user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
+            user=self.user,
+            notification_type=TestNotificationType.key,
+            frequency=DailyFrequency.key,
         )
 
         self.assertEqual(frequency.user, self.user)
@@ -131,17 +145,23 @@ class NotificationFrequencyModelTest(TestCase):
 
     def test_unique_together_constraint(self):
         NotificationFrequency.objects.create(
-            user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
+            user=self.user,
+            notification_type=TestNotificationType.key,
+            frequency=DailyFrequency.key,
         )
 
         with self.assertRaises(IntegrityError):
             NotificationFrequency.objects.create(
-                user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
+                user=self.user,
+                notification_type=TestNotificationType.key,
+                frequency=DailyFrequency.key,
             )
 
     def test_clean_with_invalid_notification_type(self):
         frequency = NotificationFrequency(
-            user=self.user, notification_type="invalid_type", frequency=DailyFrequency.key
+            user=self.user,
+            notification_type="invalid_type",
+            frequency=DailyFrequency.key,
         )
 
         with self.assertRaises(ValidationError) as cm:
@@ -151,7 +171,9 @@ class NotificationFrequencyModelTest(TestCase):
 
     def test_clean_with_invalid_frequency(self):
         frequency = NotificationFrequency(
-            user=self.user, notification_type=TestNotificationType.key, frequency="invalid_frequency"
+            user=self.user,
+            notification_type=TestNotificationType.key,
+            frequency="invalid_frequency",
         )
 
         with self.assertRaises(ValidationError) as cm:
@@ -161,7 +183,9 @@ class NotificationFrequencyModelTest(TestCase):
 
     def test_clean_with_valid_data(self):
         frequency = NotificationFrequency(
-            user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
+            user=self.user,
+            notification_type=TestNotificationType.key,
+            frequency=DailyFrequency.key,
         )
 
         # Should not raise any exception
@@ -288,16 +312,13 @@ class NotificationModelTest(TestCase):
         self.assertFalse(notification.is_sent_on_channel(WebsiteChannel))
 
     def test_get_absolute_url_empty_url(self):
-        notification = create_notification_with_channels(
-            user=self.user, notification_type=TestNotificationType.key, channels=[WebsiteChannel.key]
-        )
+        notification = create_notification_with_channels(user=self.user, notification_type=TestNotificationType.key)
         self.assertEqual(notification.get_absolute_url(), "")
 
     def test_get_absolute_url_already_absolute(self):
         notification = create_notification_with_channels(
             user=self.user,
             notification_type=TestNotificationType.key,
-            channels=[WebsiteChannel.key],
             url="https://example.com/path",
         )
         self.assertEqual(notification.get_absolute_url(), "https://example.com/path")
@@ -306,7 +327,6 @@ class NotificationModelTest(TestCase):
         notification = create_notification_with_channels(
             user=self.user,
             notification_type=TestNotificationType.key,
-            channels=[WebsiteChannel.key],
             url="/notifications/123",
         )
 
@@ -317,7 +337,6 @@ class NotificationModelTest(TestCase):
         notification = create_notification_with_channels(
             user=self.user,
             notification_type=TestNotificationType.key,
-            channels=[WebsiteChannel.key],
             url="/notifications/123",
         )
 
@@ -329,7 +348,6 @@ class NotificationModelTest(TestCase):
         notification = create_notification_with_channels(
             user=self.user,
             notification_type=TestNotificationType.key,
-            channels=[WebsiteChannel.key],
             url="/notifications/123",
         )
 
@@ -341,7 +359,6 @@ class NotificationModelTest(TestCase):
         notification = create_notification_with_channels(
             user=self.user,
             notification_type=TestNotificationType.key,
-            channels=[WebsiteChannel.key],
             url="/notifications/123",
         )
 
@@ -352,7 +369,6 @@ class NotificationModelTest(TestCase):
         notification = create_notification_with_channels(
             user=self.user,
             notification_type=TestNotificationType.key,
-            channels=[WebsiteChannel.key],
             url="/notifications/123",
         )
 
@@ -364,7 +380,6 @@ class NotificationModelTest(TestCase):
         notification = create_notification_with_channels(
             user=self.user,
             notification_type=TestNotificationType.key,
-            channels=[WebsiteChannel.key],
             url="/notifications/123",
         )
 
