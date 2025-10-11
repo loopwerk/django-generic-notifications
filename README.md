@@ -137,7 +137,7 @@ save_notification_preferences(user, request.POST)
 You can also manage preferences directly:
 
 ```python
-from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency
+from generic_notifications.models import DisabledNotificationTypeChannel, NotificationFrequency
 from generic_notifications.channels import EmailChannel
 from generic_notifications.frequencies import RealtimeFrequency
 from myapp.notifications import CommentNotification
@@ -146,7 +146,7 @@ from myapp.notifications import CommentNotification
 CommentNotification.disable_channel(user=user, channel=EmailChannel)
 
 # Change to realtime digest for a notification type
-CommentNotification.set_email_frequency(user=user, frequency=RealtimeFrequency)
+CommentNotification.set_frequency(user=user, frequency=RealtimeFrequency)
 ```
 
 ## Custom Channels
@@ -154,10 +154,10 @@ CommentNotification.set_email_frequency(user=user, frequency=RealtimeFrequency)
 Create custom delivery channels:
 
 ```python
-from generic_notifications.channels import NotificationChannel, register
+from generic_notifications.channels import BaseChannel, register
 
 @register
-class SMSChannel(NotificationChannel):
+class SMSChannel(BaseChannel):
     key = "sms"
     name = "SMS"
 
@@ -174,10 +174,10 @@ class SMSChannel(NotificationChannel):
 Add custom email frequencies:
 
 ```python
-from generic_notifications.frequencies import NotificationFrequency, register
+from generic_notifications.frequencies import BaseFrequency, register
 
 @register
-class WeeklyFrequency(NotificationFrequency):
+class WeeklyFrequency(BaseFrequency):
     key = "weekly"
     name = "Weekly digest"
     is_realtime = False

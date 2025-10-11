@@ -17,7 +17,6 @@ def migrate_channels_to_notificationchannel(apps, schema_editor):
                 channel=channel,
             )
 
-            # If this is the email channel and email_sent_at is set, mark it as sent
             if notification.email_sent_at:
                 delivery.sent_at = notification.email_sent_at
                 delivery.save()
