@@ -141,13 +141,13 @@ class EmailChannelTest(TestCase):
         self.assertIsNone(notification.email_sent_at)
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
-    def test_send_email_now_basic(self):
+    def test_send_now_basic(self):
         notification = Notification.objects.create(
             recipient=self.user, notification_type="test_type", subject="Test Subject", text="Test message"
         )
 
         channel = EmailChannel()
-        channel.send_email_now(notification)
+        channel.send_now(notification)
 
         # Check email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -162,12 +162,12 @@ class EmailChannelTest(TestCase):
         self.assertIsNotNone(notification.email_sent_at)
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
-    def test_send_email_now_uses_get_methods(self):
+    def test_send_now_uses_get_methods(self):
         # Create notification without stored subject/text to test dynamic generation
         notification = Notification.objects.create(recipient=self.user, notification_type="test_type")
 
         channel = EmailChannel()
-        channel.send_email_now(notification)
+        channel.send_now(notification)
 
         # Check that email was sent using the get_subject/get_text methods
         self.assertEqual(len(mail.outbox), 1)
@@ -179,7 +179,7 @@ class EmailChannelTest(TestCase):
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     @patch("generic_notifications.channels.render_to_string")
-    def test_send_email_now_with_template(self, mock_render):
+    def test_send_now_with_template(self, mock_render):
         # Set up mock to return different values for different templates
         def mock_render_side_effect(template_name, context):
             if template_name.endswith("_subject.txt"):
@@ -197,7 +197,7 @@ class EmailChannelTest(TestCase):
         )
 
         channel = EmailChannel()
-        channel.send_email_now(notification)
+        channel.send_now(notification)
 
         # Check templates were rendered (subject, HTML, then text)
         self.assertEqual(mock_render.call_count, 3)
@@ -227,13 +227,13 @@ class EmailChannelTest(TestCase):
         self.assertEqual(email.alternatives[0][0], "<html>Test HTML</html>")  # type: ignore
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
-    def test_send_email_now_template_error_fallback(self):
+    def test_send_now_template_error_fallback(self):
         notification = Notification.objects.create(
             recipient=self.user, notification_type="test_type", subject="Test Subject"
         )
 
         channel = EmailChannel()
-        channel.send_email_now(notification)
+        channel.send_now(notification)
 
         # Should still send email without HTML
         self.assertEqual(len(mail.outbox), 1)
@@ -245,7 +245,7 @@ class EmailChannelTest(TestCase):
     def test_send_digest_emails_empty_queryset(self):
         # No notifications exist, so digest should not send anything
         empty_notifications = Notification.objects.none()
-        EmailChannel.send_digest_emails(self.user, empty_notifications)
+        EmailChannel().send_digest(empty_notifications)
 
         # No email should be sent when no notifications exist
         self.assertEqual(len(mail.outbox), 0)
@@ -263,7 +263,7 @@ class EmailChannelTest(TestCase):
         notifications = Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
 
         # Send digest email for this user
-        EmailChannel.send_digest_emails(self.user, notifications)
+        EmailChannel().send_digest(notifications)
 
         # Check email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -283,9 +283,7 @@ class EmailChannelTest(TestCase):
 
         Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
 
-        EmailChannel.send_digest_emails(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Digest - 1 new notification")
@@ -297,9 +295,7 @@ class EmailChannelTest(TestCase):
 
         Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
 
-        EmailChannel.send_digest_emails(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Digest - 1 new notification")
@@ -315,9 +311,7 @@ class EmailChannelTest(TestCase):
             for i in range(15)
         ]
 
-        EmailChannel.send_digest_emails(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         # The implementation may not have this feature, so we'll just check that email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -334,9 +328,7 @@ class EmailChannelTest(TestCase):
 
         Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
 
-        EmailChannel.send_digest_emails(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         # Check templates were rendered (subject, HTML, then text)
         self.assertEqual(mock_render.call_count, 3)
@@ -355,7 +347,7 @@ class EmailChannelTest(TestCase):
         self.assertEqual(html_call[0][1]["user"], self.user)
         self.assertEqual(html_call[0][1]["count"], 1)
 
-    def test_send_email_now_fallback_includes_url(self):
+    def test_send_now_fallback_includes_url(self):
         """Test that fallback email content includes URL when available"""
         notification = Notification.objects.create(
             recipient=self.user,
@@ -366,7 +358,7 @@ class EmailChannelTest(TestCase):
             url="https://example.com/test/url/123",
         )
 
-        EmailChannel().send_email_now(notification)
+        EmailChannel().send_now(notification)
 
         # Check that one email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -394,9 +386,7 @@ class EmailChannelTest(TestCase):
             url="https://example.com/url/2",
         )
 
-        EmailChannel.send_digest_emails(
-            self.user, Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True)
-        )
+        EmailChannel().send_digest(Notification.objects.filter(recipient=self.user, email_sent_at__isnull=True))
 
         # Check that one email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -410,3 +400,143 @@ class EmailChannelTest(TestCase):
 - First notification
   https://example.com/url/1"""
         self.assertEqual(sent_email.body, expected_body)
+
+
+class CustomEmailChannelTest(TestCase):
+    """Test that custom EmailChannel subclasses work correctly with digest functionality."""
+
+    user: Any
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create_user(username="user1", email="test@example.com", password="testpass")
+
+    def setUp(self):
+        # Clear any existing emails
+        mail.outbox.clear()
+
+    def test_custom_email_channel_send_email_override(self):
+        """Test that a custom EmailChannel subclass can override _send_email method."""
+
+        class TestEmailChannel(EmailChannel):
+            """Custom email channel that tracks calls to _send_email."""
+
+            key = "test_email"
+            name = "Test Email"
+
+            def __init__(self):
+                super().__init__()
+                self.sent_emails = []
+
+            def send_email(
+                self, recipient: str, subject: str, text_message: str, html_message: str | None = None
+            ) -> None:
+                """Override to track calls instead of actually sending."""
+                self.sent_emails.append(
+                    {
+                        "recipient": recipient,
+                        "subject": subject,
+                        "text_message": text_message,
+                        "html_message": html_message,
+                    }
+                )
+                # Don't call super() - we don't want to actually send emails
+
+        # Create notifications
+        notification1 = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=["test_email"],
+            subject="Test Subject 1",
+            text="Test notification 1",
+        )
+
+        notification2 = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=["test_email"],
+            subject="Test Subject 2",
+            text="Test notification 2",
+        )
+
+        notifications = Notification.objects.filter(id__in=[notification1.id, notification2.id])
+
+        # Test the custom channel
+        custom_channel = TestEmailChannel()
+        custom_channel.send_digest(notifications)
+
+        # Verify the custom _send_email method was called
+        self.assertEqual(len(custom_channel.sent_emails), 1)
+        sent_email = custom_channel.sent_emails[0]
+
+        # Check the email details
+        self.assertEqual(sent_email["recipient"], "test@example.com")
+        self.assertIn("2 new notifications", sent_email["subject"])
+        self.assertIn("Test notification 1", sent_email["text_message"])
+        self.assertIn("Test notification 2", sent_email["text_message"])
+
+        # Verify no actual emails were sent via Django's mail system
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Check that notifications were marked as sent
+        notification1.refresh_from_db()
+        notification2.refresh_from_db()
+        self.assertIsNotNone(notification1.email_sent_at)
+        self.assertIsNotNone(notification2.email_sent_at)
+
+    def test_custom_email_channel_send_now_override(self):
+        """Test that a custom EmailChannel subclass works with send_now."""
+
+        class AsyncEmailChannel(EmailChannel):
+            """Custom email channel that queues emails instead of sending immediately."""
+
+            key = "async_email"
+            name = "Async Email"
+
+            def __init__(self):
+                super().__init__()
+                self.queued_emails = []
+
+            def send_email(
+                self, recipient: str, subject: str, text_message: str, html_message: str | None = None
+            ) -> None:
+                """Queue email for later processing instead of sending immediately."""
+                self.queued_emails.append(
+                    {
+                        "recipient": recipient,
+                        "subject": subject,
+                        "text_message": text_message,
+                        "html_message": html_message,
+                        "queued_at": "now",  # In real implementation, would use timezone.now()
+                    }
+                )
+
+        # Create notification
+        notification = Notification.objects.create(
+            recipient=self.user,
+            notification_type=TestNotificationType.key,
+            channels=["async_email"],
+            subject="Realtime Test",
+            text="Realtime notification",
+        )
+
+        # Test the custom channel with send_now
+        custom_channel = AsyncEmailChannel()
+        custom_channel.send_now(notification)
+
+        # Verify the email was queued instead of sent
+        self.assertEqual(len(custom_channel.queued_emails), 1)
+        queued_email = custom_channel.queued_emails[0]
+
+        self.assertEqual(queued_email["recipient"], "test@example.com")
+        self.assertEqual(queued_email["subject"], "Realtime Test")
+        self.assertIn("Realtime notification", queued_email["text_message"])
+        self.assertIsNotNone(queued_email["queued_at"])
+
+        # Verify no actual emails were sent
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Check that notification was marked as sent
+        notification.refresh_from_db()
+        self.assertIsNotNone(notification.email_sent_at)
