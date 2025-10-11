@@ -35,121 +35,6 @@ class NotificationQuerySet(models.QuerySet):
         return self.filter(read__isnull=True)
 
 
-class DisabledNotificationTypeChannel(models.Model):
-    """
-    If a row exists here, that notification type/channel combination is DISABLED for the user.
-    By default (no row), all notifications are enabled on all channels.
-    """
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="disabled_notification_type_channels")
-    notification_type = models.CharField(max_length=50)
-    channel = models.CharField(max_length=20)
-
-    class Meta:
-        unique_together = ["user", "notification_type", "channel"]
-
-    def clean(self):
-        try:
-            notification_type_cls = registry.get_type(self.notification_type)
-        except KeyError:
-            available_types = [t.key for t in registry.get_all_types()]
-            if available_types:
-                raise ValidationError(
-                    f"Unknown notification type: {self.notification_type}. Available types: {available_types}"
-                )
-            else:
-                raise ValidationError(
-                    f"Unknown notification type: {self.notification_type}. No notification types are currently registered."
-                )
-
-        # Check if trying to disable a required channel
-        required_channel_keys = [cls.key for cls in notification_type_cls.required_channels]
-        if self.channel in required_channel_keys:
-            raise ValidationError(
-                f"Cannot disable {self.channel} channel for {notification_type_cls.name} - this channel is required"
-            )
-
-        try:
-            registry.get_channel(self.channel)
-        except KeyError:
-            available_channels = [c.key for c in registry.get_all_channels()]
-            if available_channels:
-                raise ValidationError(f"Unknown channel: {self.channel}. Available channels: {available_channels}")
-            else:
-                raise ValidationError(f"Unknown channel: {self.channel}. No channels are currently registered.")
-
-    def __str__(self) -> str:
-        return f"{self.user} disabled {self.notification_type} on {self.channel}"
-
-
-class NotificationFrequency(models.Model):
-    """
-    Delivery frequency preference per notification type.
-    This applies to all channels that support the chosen frequency.
-    Default is `NotificationType.default_frequency` if no row exists.
-    """
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notification_frequencies")
-    notification_type = models.CharField(max_length=50)
-    frequency = models.CharField(max_length=20)
-
-    class Meta:
-        unique_together = ["user", "notification_type"]
-
-    def clean(self):
-        if self.notification_type:
-            try:
-                registry.get_type(self.notification_type)
-            except KeyError:
-                available_types = [t.key for t in registry.get_all_types()]
-                if available_types:
-                    raise ValidationError(
-                        f"Unknown notification type: {self.notification_type}. Available types: {available_types}"
-                    )
-                else:
-                    raise ValidationError(
-                        f"Unknown notification type: {self.notification_type}. No notification types are currently registered."
-                    )
-
-        if self.frequency:
-            try:
-                registry.get_frequency(self.frequency)
-            except KeyError:
-                available_frequencies = [f.key for f in registry.get_all_frequencies()]
-                if available_frequencies:
-                    raise ValidationError(
-                        f"Unknown frequency: {self.frequency}. Available frequencies: {available_frequencies}"
-                    )
-                else:
-                    raise ValidationError(
-                        f"Unknown frequency: {self.frequency}. No frequencies are currently registered."
-                    )
-
-    def __str__(self) -> str:
-        return f"{self.user} - {self.notification_type}: {self.frequency}"
-
-
-class NotificationChannel(models.Model):
-    """
-    Tracks which channels a notification should be sent through and their delivery status.
-    """
-
-    notification = models.ForeignKey("Notification", on_delete=models.CASCADE, related_name="channels")
-    channel = models.CharField(max_length=20)  # e.g., 'email', 'website', etc.
-    sent_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        unique_together = ["notification", "channel"]
-        indexes = [
-            models.Index(fields=["notification", "channel", "sent_at"]),
-            models.Index(fields=["channel", "sent_at"]),  # For digest queries
-        ]
-
-    def __str__(self):
-        status = "sent" if self.sent_at else "pending"
-        return f"{self.notification} - {self.channel} ({status})"
-
-
 class Notification(models.Model):
     """
     A specific notification instance for a user
@@ -302,3 +187,118 @@ class Notification(models.Model):
 
         # No base URL configured, return relative URL
         return self.url
+
+
+class NotificationChannel(models.Model):
+    """
+    Tracks which channels a notification should be sent through and their delivery status.
+    """
+
+    notification = models.ForeignKey(Notification, on_delete=models.CASCADE, related_name="channels")
+    channel = models.CharField(max_length=20)  # e.g., 'email', 'website', etc.
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ["notification", "channel"]
+        indexes = [
+            models.Index(fields=["notification", "channel", "sent_at"]),
+            models.Index(fields=["channel", "sent_at"]),  # For digest queries
+        ]
+
+    def __str__(self):
+        status = "sent" if self.sent_at else "pending"
+        return f"{self.notification} - {self.channel} ({status})"
+
+
+class DisabledNotificationTypeChannel(models.Model):
+    """
+    If a row exists here, that notification type/channel combination is DISABLED for the user.
+    By default (no row), all notifications are enabled on all channels.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="disabled_notification_type_channels")
+    notification_type = models.CharField(max_length=50)
+    channel = models.CharField(max_length=20)
+
+    class Meta:
+        unique_together = ["user", "notification_type", "channel"]
+
+    def clean(self):
+        try:
+            notification_type_cls = registry.get_type(self.notification_type)
+        except KeyError:
+            available_types = [t.key for t in registry.get_all_types()]
+            if available_types:
+                raise ValidationError(
+                    f"Unknown notification type: {self.notification_type}. Available types: {available_types}"
+                )
+            else:
+                raise ValidationError(
+                    f"Unknown notification type: {self.notification_type}. No notification types are currently registered."
+                )
+
+        # Check if trying to disable a required channel
+        required_channel_keys = [cls.key for cls in notification_type_cls.required_channels]
+        if self.channel in required_channel_keys:
+            raise ValidationError(
+                f"Cannot disable {self.channel} channel for {notification_type_cls.name} - this channel is required"
+            )
+
+        try:
+            registry.get_channel(self.channel)
+        except KeyError:
+            available_channels = [c.key for c in registry.get_all_channels()]
+            if available_channels:
+                raise ValidationError(f"Unknown channel: {self.channel}. Available channels: {available_channels}")
+            else:
+                raise ValidationError(f"Unknown channel: {self.channel}. No channels are currently registered.")
+
+    def __str__(self) -> str:
+        return f"{self.user} disabled {self.notification_type} on {self.channel}"
+
+
+class NotificationFrequency(models.Model):
+    """
+    Delivery frequency preference per notification type.
+    This applies to all channels that support the chosen frequency.
+    Default is `NotificationType.default_frequency` if no row exists.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notification_frequencies")
+    notification_type = models.CharField(max_length=50)
+    frequency = models.CharField(max_length=20)
+
+    class Meta:
+        unique_together = ["user", "notification_type"]
+
+    def clean(self):
+        if self.notification_type:
+            try:
+                registry.get_type(self.notification_type)
+            except KeyError:
+                available_types = [t.key for t in registry.get_all_types()]
+                if available_types:
+                    raise ValidationError(
+                        f"Unknown notification type: {self.notification_type}. Available types: {available_types}"
+                    )
+                else:
+                    raise ValidationError(
+                        f"Unknown notification type: {self.notification_type}. No notification types are currently registered."
+                    )
+
+        if self.frequency:
+            try:
+                registry.get_frequency(self.frequency)
+            except KeyError:
+                available_frequencies = [f.key for f in registry.get_all_frequencies()]
+                if available_frequencies:
+                    raise ValidationError(
+                        f"Unknown frequency: {self.frequency}. Available frequencies: {available_frequencies}"
+                    )
+                else:
+                    raise ValidationError(
+                        f"Unknown frequency: {self.frequency}. No frequencies are currently registered."
+                    )
+
+    def __str__(self) -> str:
+        return f"{self.user} - {self.notification_type}: {self.frequency}"
