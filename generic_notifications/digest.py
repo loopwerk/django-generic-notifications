@@ -14,29 +14,22 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-def send_notification_digests(frequency_key: str, dry_run: bool = False) -> int:
+def send_notification_digests(frequency: type[BaseFrequency], dry_run: bool = False) -> int:
     """
     Send notification digests for a specific frequency across all channels that support digests.
 
     Args:
-        frequency_key: The frequency key to process (e.g., 'daily', 'weekly')
+        frequency: The frequency class to process (e.g., DailyFrequency, WeeklyFrequency)
         dry_run: If True, don't actually send notifications, just log what would be sent
 
     Returns:
         Total number of digests sent across all channels
 
     Raises:
-        KeyError: If the frequency key is not found
         ValueError: If the frequency is realtime (not a digest frequency)
     """
-    # Get the specific frequency (required argument)
-    try:
-        frequency_cls = registry.get_frequency(frequency_key)
-    except KeyError:
-        raise KeyError(f"Frequency '{frequency_key}' not found")
-
-    if frequency_cls.is_realtime:
-        raise ValueError(f"Frequency '{frequency_key}' is realtime, not a digest frequency")
+    if frequency.is_realtime:
+        raise ValueError(f"Frequency '{frequency.key}' is realtime, not a digest frequency")
 
     # Get all channels that support digest functionality
     digest_channels = [channel_cls() for channel_cls in registry.get_all_channels() if channel_cls.supports_digest]
@@ -45,13 +38,13 @@ def send_notification_digests(frequency_key: str, dry_run: bool = False) -> int:
         logger.warning("No channels support digest functionality")
         return 0
 
-    logger.info(f"Processing {frequency_cls.name} digests for {len(digest_channels)} channel(s)...")
+    logger.info(f"Processing {frequency.name} digests for {len(digest_channels)} channel(s)...")
 
     all_notification_types = registry.get_all_types()
     total_digests_sent = 0
 
     for channel in digest_channels:
-        channel_digests_sent = _send_digest_for_channel(channel, frequency_cls, all_notification_types, dry_run)
+        channel_digests_sent = _send_digest_for_channel(channel, frequency, all_notification_types, dry_run)
         total_digests_sent += channel_digests_sent
 
         if dry_run:
