@@ -1,5 +1,5 @@
 from django.contrib import admin
-from generic_notifications.models import DisabledNotificationTypeChannel, NotificationFrequency, Notification
+from generic_notifications.models import DisabledNotificationTypeChannel, Notification, NotificationFrequency
 
 
 @admin.register(Notification)

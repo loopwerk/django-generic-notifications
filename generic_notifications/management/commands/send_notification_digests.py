@@ -2,7 +2,7 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from generic_notifications.digest import send_digest_notifications
+from generic_notifications.digest import send_notification_digests
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class Command(BaseCommand):
             logger.info("DRY RUN - No notifications will be sent")
 
         try:
-            total_digests_sent = send_digest_notifications(target_frequency, dry_run)
+            total_digests_sent = send_notification_digests(target_frequency, dry_run)
 
             if dry_run:
                 logger.info(f"DRY RUN: Would have sent {total_digests_sent} digest notifications")

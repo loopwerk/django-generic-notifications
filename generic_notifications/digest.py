@@ -14,9 +14,9 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-def send_digest_notifications(frequency_key: str, dry_run: bool = False) -> int:
+def send_notification_digests(frequency_key: str, dry_run: bool = False) -> int:
     """
-    Send digest notifications for a specific frequency across all channels that support digests.
+    Send notification digests for a specific frequency across all channels that support digests.
 
     Args:
         frequency_key: The frequency key to process (e.g., 'daily', 'weekly')

@@ -58,7 +58,7 @@ class SendDigestEmailsCommandTest(TestCase):
 
     def test_dry_run_option(self):
         # Just test that dry-run option works without errors
-        call_command("send_digest_emails", "--frequency", "daily", "--dry-run")
+        call_command("send_notification_digests", "--frequency", "daily", "--dry-run")
 
     def test_no_digest_frequencies(self):
         # Clear all frequencies and add only realtime
@@ -66,16 +66,16 @@ class SendDigestEmailsCommandTest(TestCase):
         registry.register_frequency(RealtimeFrequency)
 
         # Should complete without sending any emails
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
         self.assertEqual(len(mail.outbox), 0)
 
     def test_target_frequency_not_found(self):
         # Should complete without error when frequency not found (logging is handled internally)
-        call_command("send_digest_emails", "--frequency", "nonexistent")
+        call_command("send_notification_digests", "--frequency", "nonexistent")
 
     def test_target_frequency_is_realtime(self):
         # Should complete without error when frequency is realtime (logging is handled internally)
-        call_command("send_digest_emails", "--frequency", "realtime")
+        call_command("send_notification_digests", "--frequency", "realtime")
 
     def test_send_digest_emails_basic_flow(self):
         # Set up user with daily frequency preference
@@ -93,7 +93,7 @@ class SendDigestEmailsCommandTest(TestCase):
         # No emails should be in outbox initially
         self.assertEqual(len(mail.outbox), 0)
 
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
 
         # Verify email was sent
         self.assertEqual(len(mail.outbox), 1)
@@ -119,7 +119,7 @@ class SendDigestEmailsCommandTest(TestCase):
         # Ensure no emails in outbox initially
         self.assertEqual(len(mail.outbox), 0)
 
-        call_command("send_digest_emails", "--frequency", "daily", "--dry-run")
+        call_command("send_notification_digests", "--frequency", "daily", "--dry-run")
 
         # Should not send any emails in dry run
         self.assertEqual(len(mail.outbox), 0)
@@ -150,7 +150,7 @@ class SendDigestEmailsCommandTest(TestCase):
             channels=["email"],
         )
 
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
 
         # Should send one email with only unread notification
         self.assertEqual(len(mail.outbox), 1)
@@ -185,7 +185,7 @@ class SendDigestEmailsCommandTest(TestCase):
             channels=["email"],
         )
 
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
 
         # Should send one email with only unsent notification
         self.assertEqual(len(mail.outbox), 1)
@@ -221,7 +221,7 @@ class SendDigestEmailsCommandTest(TestCase):
             channels=["email"],
         )
 
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
 
         # Should send one email with both notifications (no time window filtering)
         self.assertEqual(len(mail.outbox), 1)
@@ -259,7 +259,7 @@ class SendDigestEmailsCommandTest(TestCase):
             channels=["email"],
         )
 
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
 
         # Should only send email to daily user
         self.assertEqual(len(mail.outbox), 1)
@@ -269,7 +269,7 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # Clear outbox and test weekly frequency
         mail.outbox.clear()
-        call_command("send_digest_emails", "--frequency", "weekly")
+        call_command("send_notification_digests", "--frequency", "weekly")
 
         # Should only send email to weekly user
         self.assertEqual(len(mail.outbox), 1)
@@ -298,7 +298,7 @@ class SendDigestEmailsCommandTest(TestCase):
             channels=["email"],
         )
 
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
 
         # Should send one digest email with both notifications
         self.assertEqual(len(mail.outbox), 1)
@@ -321,7 +321,7 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # No notifications created
 
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
 
         # Should not send any emails
         self.assertEqual(len(mail.outbox), 0)
@@ -335,7 +335,7 @@ class SendDigestEmailsCommandTest(TestCase):
         )
 
         # Run daily digest - should not send anything (no email channel)
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
         self.assertEqual(len(mail.outbox), 0)
 
     def test_users_with_default_frequencies_get_digest(self):
@@ -361,7 +361,7 @@ class SendDigestEmailsCommandTest(TestCase):
         )
 
         # Run daily digest - should include comment but not system message
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
 
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
@@ -398,11 +398,11 @@ class SendDigestEmailsCommandTest(TestCase):
         )
 
         # Run daily digest - should get nothing (test_type is weekly, other_type is realtime)
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
         self.assertEqual(len(mail.outbox), 0)
 
         # Run weekly digest - should get test notification
-        call_command("send_digest_emails", "--frequency", "weekly")
+        call_command("send_notification_digests", "--frequency", "weekly")
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
         self.assertEqual(email.body, "You have 1 new notification:\n\n- Test notification text")
@@ -427,7 +427,7 @@ class SendDigestEmailsCommandTest(TestCase):
             )
 
         # Run daily digest - should get user1 and user3 (both have test_type=daily)
-        call_command("send_digest_emails", "--frequency", "daily")
+        call_command("send_notification_digests", "--frequency", "daily")
         self.assertEqual(len(mail.outbox), 2)
 
         recipients = {email.to[0] for email in mail.outbox}
@@ -435,7 +435,7 @@ class SendDigestEmailsCommandTest(TestCase):
 
         # Clear outbox and run weekly digest - should get user2
         mail.outbox.clear()
-        call_command("send_digest_emails", "--frequency", "weekly")
+        call_command("send_notification_digests", "--frequency", "weekly")
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to[0], self.user2.email)
         self.assertEqual(mail.outbox[0].body, "You have 1 new notification:\n\n- Test notification for user 2 text")

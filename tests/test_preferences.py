@@ -73,9 +73,9 @@ class GetNotificationPreferencesTest(TestCase):
 
         for pref in preferences:
             if pref["notification_type"].key == "test_notification":
-                self.assertEqual(pref["email_frequency"], "realtime")
+                self.assertEqual(pref["notification_frequency"], "realtime")
             elif pref["notification_type"].key == "required_channel_notification":
-                self.assertEqual(pref["email_frequency"], "daily")
+                self.assertEqual(pref["notification_frequency"], "daily")
 
         # Now override one
         NotificationFrequency.objects.create(user=self.user, notification_type="test_notification", frequency="daily")
@@ -84,7 +84,7 @@ class GetNotificationPreferencesTest(TestCase):
 
         for pref in preferences:
             if pref["notification_type"].key == "test_notification":
-                self.assertEqual(pref["email_frequency"], "daily")
+                self.assertEqual(pref["notification_frequency"], "daily")
 
 
 class SaveNotificationPreferencesTest(TestCase):
