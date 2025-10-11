@@ -8,13 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Send digest emails to users who have opted for digest delivery"
+    help = "Send notification digests to users who have opted for digest delivery"
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Show what would be sent without actually sending emails",
+            help="Show what would be sent without actually sending the digests",
         )
         parser.add_argument(
             "--frequency",

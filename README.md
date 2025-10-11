@@ -102,7 +102,7 @@ Create a cron job to send daily digests:
 
 ```bash
 # Send daily digests at 9 AM
-0 9 * * * cd /path/to/project && uv run ./manage.py send_digest_emails --frequency daily
+0 9 * * * cd /path/to/project && uv run ./manage.py send_notification_digests --frequency daily
 ```
 
 ## User Preferences
@@ -184,11 +184,11 @@ class WeeklyFrequency(BaseFrequency):
     description = "Receive a weekly summary every Monday"
 ```
 
-When you add custom email frequencies you’ll have to run `send_digest_emails` for them as well. For example, if you created that weekly digest:
+When you add custom email frequencies you'll have to run `send_notification_digests` for them as well. For example, if you created that weekly digest:
 
 ```bash
 # Send weekly digest every Monday at 9 AM
-0 9 * * 1 cd /path/to/project && uv run ./manage.py send_digest_emails --frequency weekly
+0 9 * * 1 cd /path/to/project && uv run ./manage.py send_notification_digests --frequency weekly
 ```
 
 ## Email Templates
