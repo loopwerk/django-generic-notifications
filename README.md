@@ -131,7 +131,14 @@ Create a cron job to send daily digests:
 0 9 * * * cd /path/to/project && uv run ./manage.py send_notification_digests --frequency daily
 ```
 
-_If you already have a way the run scheduled jobs in your Django app and don't want to start a management command via a cron job, you can call the `send_notification_digests` function within `digest.py` yourself._
+If you already have a way to run scheduled jobs in your Django app and don't want to start a management command via a cron job, you can call the `send_notification_digests` function directly:
+
+```python
+from generic_notifications.digest import send_notification_digests
+from generic_notifications.frequencies import DailyFrequency
+
+send_notification_digests(frequency=DailyFrequency, dry_run=False)
+```
 
 ## Admin Integration
 
