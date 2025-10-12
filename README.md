@@ -54,11 +54,13 @@ NOTIFICATION_BASE_URL = "www.example.com"
 ```
 
 **Protocol handling**: If you omit the protocol, it's automatically added:
-- `https://` in production (`DEBUG = False`)  
+
+- `https://` in production (`DEBUG = False`)
 - `http://` in development (`DEBUG = True`)
 
 **Fallback order** if `NOTIFICATION_BASE_URL` is not set:
-1. `BASE_URL` setting  
+
+1. `BASE_URL` setting
 2. `SITE_URL` setting
 3. Django Sites framework (if `django.contrib.sites` is installed)
 4. URLs remain relative if no base URL is found (not ideal in emails!)
@@ -102,14 +104,14 @@ Create a cron job to send daily digests:
 
 ```bash
 # Send daily digests at 9 AM
-0 9 * * * cd /path/to/project && uv run ./manage.py send_digest_emails --frequency daily
+0 9 * * * cd /path/to/project && uv run ./manage.py send_notification_digests --frequency daily
 ```
 
 ## User Preferences
 
 By default every user gets notifications of all registered types delivered to every registered channel, but users can opt-out of receiving notification types, per channel.
 
-All notification types default to daily digest, except for `SystemMessage` which defaults to real-time. Users can choose  different frequency per notification type.
+All notification types default to daily digest, except for `SystemMessage` which defaults to real-time. Users can choose different frequency per notification type.
 
 This project doesn't come with a UI (view + template) for managing user preferences, but an example is provided in the [example app](#example-app).
 
@@ -137,7 +139,7 @@ save_notification_preferences(user, request.POST)
 You can also manage preferences directly:
 
 ```python
-from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency
+from generic_notifications.models import DisabledNotificationTypeChannel, NotificationFrequency
 from generic_notifications.channels import EmailChannel
 from generic_notifications.frequencies import RealtimeFrequency
 from myapp.notifications import CommentNotification
@@ -146,7 +148,7 @@ from myapp.notifications import CommentNotification
 CommentNotification.disable_channel(user=user, channel=EmailChannel)
 
 # Change to realtime digest for a notification type
-CommentNotification.set_email_frequency(user=user, frequency=RealtimeFrequency)
+CommentNotification.set_frequency(user=user, frequency=RealtimeFrequency)
 ```
 
 ## Custom Channels
@@ -154,10 +156,10 @@ CommentNotification.set_email_frequency(user=user, frequency=RealtimeFrequency)
 Create custom delivery channels:
 
 ```python
-from generic_notifications.channels import NotificationChannel, register
+from generic_notifications.channels import BaseChannel, register
 
 @register
-class SMSChannel(NotificationChannel):
+class SMSChannel(BaseChannel):
     key = "sms"
     name = "SMS"
 
@@ -174,21 +176,21 @@ class SMSChannel(NotificationChannel):
 Add custom email frequencies:
 
 ```python
-from generic_notifications.frequencies import NotificationFrequency, register
+from generic_notifications.frequencies import BaseFrequency, register
 
 @register
-class WeeklyFrequency(NotificationFrequency):
+class WeeklyFrequency(BaseFrequency):
     key = "weekly"
     name = "Weekly digest"
     is_realtime = False
     description = "Receive a weekly summary every Monday"
 ```
 
-When you add custom email frequencies you’ll have to run `send_digest_emails` for them as well. For example, if you created that weekly digest:
+When you add custom email frequencies you'll have to run `send_notification_digests` for them as well. For example, if you created that weekly digest:
 
 ```bash
 # Send weekly digest every Monday at 9 AM
-0 9 * * 1 cd /path/to/project && uv run ./manage.py send_digest_emails --frequency weekly
+0 9 * * 1 cd /path/to/project && uv run ./manage.py send_notification_digests --frequency weekly
 ```
 
 ## Email Templates
@@ -242,7 +244,7 @@ unread_count = get_unread_count(user=user, channel=WebsiteChannel)
 unread_notifications = get_notifications(user=user, channel=WebsiteChannel, unread_only=True)
 
 # Get notifications by channel
-website_notifications = Notification.objects.for_channel(WebsiteChannel)
+website_notifications = Notification.objects.prefetch().for_channel(WebsiteChannel)
 
 # Mark as read
 notification = website_notifications.first()
@@ -303,9 +305,9 @@ The `should_save` method is called before saving each notification. Return `Fals
 
 The `target` field is a GenericForeignKey that can point to any Django model instance. While convenient, accessing targets requires careful consideration for performance.
 
-When using Django 5.0+, this library automatically includes `.prefetch_related("target")` when using the standard query methods. This efficiently fetches target objects, but only the *direct* targets - accessing relationships *through* the target will still cause additional queries. 
+When using Django 5.0+, this library automatically includes `.prefetch_related("target")` when using the standard query methods. This efficiently fetches target objects, but only the _direct_ targets - accessing relationships _through_ the target will still cause additional queries.
 
-*On Django 4.2, you'll need to manually deal with prefetching the `target` relationship.*
+_On Django 4.2, you'll need to manually deal with prefetching the `target` relationship._
 
 Consider this problematic example that will cause N+1 queries:
 
@@ -331,7 +333,7 @@ class CommentNotificationType(NotificationType):
         actor_name = notification.actor.full_name
         article = notification.target.article
         comment_text = notification.target.comment_text
-        
+
         # This causes an extra query per notification!
         return f'{actor_name} commented on your article "{article.title}": "{comment_text}"'
 ```
@@ -365,7 +367,7 @@ However, this only works if you don’t need to dynamically generate the text - 
 If you must access relationships through the target, you can prefetch them:
 
 ```python
-# On Django 5.0+ the library already prefetches targets, 
+# On Django 5.0+ the library already prefetches targets,
 # but you need to add deeper relationships yourself
 notifications = get_notifications(user).prefetch_related(
     "target__article"  # This prevents the N+1 problem
@@ -373,6 +375,7 @@ notifications = get_notifications(user).prefetch_related(
 ```
 
 **Note**: This approach has limitations:
+
 - You need to know the target's type and relationships in advance
 - It won't work efficiently with heterogeneous targets (different model types)
 - Each additional relationship level requires explicit prefetching
@@ -408,7 +411,7 @@ class CommentNotificationType(NotificationType):
         current_lang = get_language()
         # Get parameters for current language, fallback to English
         lang_params = notification.metadata.get(current_lang, notification.metadata.get("en", {}))
-        
+
         return _("%(commenter_name)s commented on %(page_title)s") % lang_params
 
 # When creating the notification
@@ -418,7 +421,7 @@ from django.utils.translation import activate, get_language
 def create_multilingual_notification(recipient, commenter, page):
     current_lang = get_language()
     multilingual_metadata = {}
-    
+
     # Store parameters for each language
     for lang_code, _ in settings.LANGUAGES:
         activate(lang_code)
@@ -426,9 +429,9 @@ def create_multilingual_notification(recipient, commenter, page):
             "commenter_name": commenter.get_full_name(),
             "page_title": page.get_title(),  # Assumes this returns translated title
         }
-    
+
     activate(current_lang)  # Restore original language
-    
+
     send_notification(
         recipient=recipient,
         notification_type=CommentNotificationType,
@@ -454,7 +457,7 @@ class CommentNotificationType(NotificationType):
 
     def get_text(self, notification):
         from django.utils.translation import gettext as _
-        
+
         # Access current language data from the target
         if notification.target:
             return _("%(commenter)s commented on %(page_title)s") % {
@@ -477,10 +480,10 @@ send_notification(
 
 ### Performance considerations
 
-| Approach | Storage Overhead | Query Performance | Translation Freshness |
-|----------|------------------|-------------------|----------------------|
-| Approach 1 | Moderate | Excellent | Frozen when created |
-| Approach 2 | None | Good (with prefetching) | Always current |
+| Approach   | Storage Overhead | Query Performance       | Translation Freshness |
+| ---------- | ---------------- | ----------------------- | --------------------- |
+| Approach 1 | Moderate         | Excellent               | Frozen when created   |
+| Approach 2 | None             | Good (with prefetching) | Always current        |
 
 - Use **approach 1** if you have performance-critical displays and can accept that text is frozen when the notification is created
 - Use **approach 2** if you need always-current data

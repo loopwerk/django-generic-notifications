@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from generic_notifications.channels import WebsiteChannel
 from generic_notifications.frequencies import DailyFrequency, RealtimeFrequency
-from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency
+from generic_notifications.models import DisabledNotificationTypeChannel, NotificationFrequency
 from generic_notifications.preferences import get_notification_preferences, save_notification_preferences
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
@@ -17,7 +17,7 @@ class TestNotificationType(NotificationType):
     key = "test_notification"
     name = "Test Notification"
     description = "A test notification type"
-    default_email_frequency = RealtimeFrequency
+    default_frequency = RealtimeFrequency
     required_channels = []
 
 
@@ -25,7 +25,7 @@ class RequiredChannelNotificationType(NotificationType):
     key = "required_channel_notification"
     name = "Required Channel Notification"
     description = "A notification with required channels"
-    default_email_frequency = DailyFrequency
+    default_frequency = DailyFrequency
     required_channels = [WebsiteChannel]
 
 
@@ -73,18 +73,18 @@ class GetNotificationPreferencesTest(TestCase):
 
         for pref in preferences:
             if pref["notification_type"].key == "test_notification":
-                self.assertEqual(pref["email_frequency"], "realtime")
+                self.assertEqual(pref["notification_frequency"], "realtime")
             elif pref["notification_type"].key == "required_channel_notification":
-                self.assertEqual(pref["email_frequency"], "daily")
+                self.assertEqual(pref["notification_frequency"], "daily")
 
         # Now override one
-        EmailFrequency.objects.create(user=self.user, notification_type="test_notification", frequency="daily")
+        NotificationFrequency.objects.create(user=self.user, notification_type="test_notification", frequency="daily")
 
         preferences = get_notification_preferences(self.user)
 
         for pref in preferences:
             if pref["notification_type"].key == "test_notification":
-                self.assertEqual(pref["email_frequency"], "daily")
+                self.assertEqual(pref["notification_frequency"], "daily")
 
 
 class SaveNotificationPreferencesTest(TestCase):
@@ -121,7 +121,7 @@ class SaveNotificationPreferencesTest(TestCase):
         self.assertEqual(disabled.first().channel, "email")
 
         # Verify frequencies (only non-defaults saved)
-        frequencies = EmailFrequency.objects.filter(user=self.user).order_by("notification_type")
+        frequencies = NotificationFrequency.objects.filter(user=self.user).order_by("notification_type")
         self.assertEqual(frequencies.count(), 2)
 
         test_freq = frequencies.filter(notification_type="test_notification").first()
@@ -136,7 +136,7 @@ class SaveNotificationPreferencesTest(TestCase):
         DisabledNotificationTypeChannel.objects.create(
             user=self.user, notification_type="test_notification", channel="website"
         )
-        EmailFrequency.objects.create(user=self.user, notification_type="test_notification", frequency="daily")
+        NotificationFrequency.objects.create(user=self.user, notification_type="test_notification", frequency="daily")
 
         # Save completely different preferences
         form_data = {
@@ -152,7 +152,7 @@ class SaveNotificationPreferencesTest(TestCase):
         self.assertEqual(disabled.count(), 0)
 
         # Old frequency should be gone
-        frequencies = EmailFrequency.objects.filter(user=self.user)
+        frequencies = NotificationFrequency.objects.filter(user=self.user)
         self.assertEqual(frequencies.count(), 0)
 
     def test_required_channels_ignored_in_form_data(self):
@@ -206,7 +206,7 @@ class SaveNotificationPreferencesTest(TestCase):
         save_notification_preferences(self.user, form_data)
 
         # Only the non-default frequency should be saved
-        frequencies = EmailFrequency.objects.filter(user=self.user)
+        frequencies = NotificationFrequency.objects.filter(user=self.user)
         self.assertEqual(frequencies.count(), 1)
         self.assertEqual(frequencies.first().notification_type, "required_channel_notification")
         self.assertEqual(frequencies.first().frequency, "realtime")

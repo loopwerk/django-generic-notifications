@@ -48,7 +48,7 @@
                 </td>
               {% endfor %}
 
-              <!-- Email Frequency Select -->
+              <!-- Notification Frequency Select -->
               {% if "email" in channels %}
                 <td class="text-center">
                   <select name="{{ type_data.notification_type.key }}__frequency"
@@ -56,7 +56,7 @@
                           :disabled="!emailEnabled"
                           :class="{ 'opacity-50': !emailEnabled }">
                     {% for freq_key, frequency in frequencies.items %}
-                      <option value="{{ freq_key }}" {% if freq_key == type_data.email_frequency %}selected{% endif %}>{{ frequency.name }}</option>
+                      <option value="{{ freq_key }}" {% if freq_key == type_data.notification_frequency %}selected{% endif %}>{{ frequency.name }}</option>
                     {% endfor %}
                   </select>
                 </td>

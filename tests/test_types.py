@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from generic_notifications.channels import EmailChannel, WebsiteChannel
 from generic_notifications.frequencies import DailyFrequency, RealtimeFrequency
-from generic_notifications.models import DisabledNotificationTypeChannel, EmailFrequency
+from generic_notifications.models import DisabledNotificationTypeChannel, NotificationFrequency
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
 
@@ -141,15 +141,15 @@ class NotificationTypeTest(TestCase):
 
     def test_set_frequency(self):
         # Set frequency for the first time
-        TestNotificationType.set_email_frequency(self.user, DailyFrequency)
+        TestNotificationType.set_frequency(self.user, DailyFrequency)
 
         # Verify it was created
-        freq = EmailFrequency.objects.get(user=self.user, notification_type=TestNotificationType.key)
+        freq = NotificationFrequency.objects.get(user=self.user, notification_type=TestNotificationType.key)
         self.assertEqual(freq.frequency, DailyFrequency.key)
 
         # Update to a different frequency
         registry.register_frequency(RealtimeFrequency, force=True)
-        TestNotificationType.set_email_frequency(self.user, RealtimeFrequency)
+        TestNotificationType.set_frequency(self.user, RealtimeFrequency)
 
         # Verify it was updated
         freq.refresh_from_db()
@@ -157,23 +157,23 @@ class NotificationTypeTest(TestCase):
 
         # Verify there's still only one record
         self.assertEqual(
-            EmailFrequency.objects.filter(user=self.user, notification_type=TestNotificationType.key).count(), 1
+            NotificationFrequency.objects.filter(user=self.user, notification_type=TestNotificationType.key).count(), 1
         )
 
     def test_get_frequency_with_user_preference(self):
         # Set user preference
-        EmailFrequency.objects.create(
+        NotificationFrequency.objects.create(
             user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
         )
 
         # Get frequency should return the user's preference
-        frequency_cls = TestNotificationType.get_email_frequency(self.user)
+        frequency_cls = TestNotificationType.get_frequency(self.user)
         self.assertEqual(frequency_cls.key, DailyFrequency.key)
         self.assertEqual(frequency_cls, DailyFrequency)
 
     def test_get_frequency_returns_default_when_no_preference(self):
-        # TestNotificationType has default_email_frequency = DailyFrequency
-        frequency_cls = TestNotificationType.get_email_frequency(self.user)
+        # TestNotificationType has default_frequency = DailyFrequency
+        frequency_cls = TestNotificationType.get_frequency(self.user)
         self.assertEqual(frequency_cls.key, DailyFrequency.key)
         self.assertEqual(frequency_cls, DailyFrequency)
 
@@ -184,32 +184,32 @@ class NotificationTypeTest(TestCase):
         class RealtimeNotificationType(NotificationType):
             key = "realtime_type"
             name = "Realtime Type"
-            default_email_frequency = RealtimeFrequency
+            default_frequency = RealtimeFrequency
 
         registry.register_type(RealtimeNotificationType)
 
         # Should return the custom default
-        frequency_cls = RealtimeNotificationType.get_email_frequency(self.user)
+        frequency_cls = RealtimeNotificationType.get_frequency(self.user)
         self.assertEqual(frequency_cls.key, RealtimeFrequency.key)
         self.assertEqual(frequency_cls, RealtimeFrequency)
 
     def test_reset_to_default(self):
         # First set a custom preference
-        EmailFrequency.objects.create(
+        NotificationFrequency.objects.create(
             user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
         )
         self.assertTrue(
-            EmailFrequency.objects.filter(user=self.user, notification_type=TestNotificationType.key).exists()
+            NotificationFrequency.objects.filter(user=self.user, notification_type=TestNotificationType.key).exists()
         )
 
         # Reset to default
-        TestNotificationType.reset_email_frequency_to_default(self.user)
+        TestNotificationType.reset_frequency_to_default(self.user)
 
         # Verify the custom preference was removed
         self.assertFalse(
-            EmailFrequency.objects.filter(user=self.user, notification_type=TestNotificationType.key).exists()
+            NotificationFrequency.objects.filter(user=self.user, notification_type=TestNotificationType.key).exists()
         )
 
         # Getting frequency should now return the default
-        frequency_cls = TestNotificationType.get_email_frequency(self.user)
-        self.assertEqual(frequency_cls, TestNotificationType.default_email_frequency)
+        frequency_cls = TestNotificationType.get_frequency(self.user)
+        self.assertEqual(frequency_cls, TestNotificationType.default_frequency)

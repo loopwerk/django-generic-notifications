@@ -1,5 +1,5 @@
 import logging
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import TYPE_CHECKING, Type
 
 from django.conf import settings
@@ -7,33 +7,52 @@ from django.core.mail import send_mail as django_send_mail
 from django.db.models import QuerySet
 from django.template.defaultfilters import pluralize
 from django.template.loader import render_to_string
-from django.utils import timezone
 
-from .frequencies import NotificationFrequency
+from .frequencies import BaseFrequency
 from .registry import registry
 
 if TYPE_CHECKING:
     from .models import Notification
 
 
-class NotificationChannel(ABC):
+class BaseChannel(ABC):
     """
     Base class for all notification channels.
     """
 
     key: str
     name: str
+    supports_realtime: bool = True
     supports_digest: bool = False
 
-    @abstractmethod
     def process(self, notification: "Notification") -> None:
         """
-        Process a notification through this channel.
+        Process a notification through this channel based on channel capabilities
+        and user preferences. If the notification should be handled realtime,
+        then call `send_now`. If it should be handled in a digest delivery,
+        then do nothing, as the send_notification_digests function/command will
+        pick it up.
 
         Args:
             notification: Notification instance to process
         """
-        pass
+        # Digest-only channels: never send immediately
+        if self.supports_digest and not self.supports_realtime:
+            return
+
+        # Channels that support both: check user preference
+        if self.supports_digest:
+            # Get notification type class from key
+            notification_type_cls = registry.get_type(notification.notification_type)
+            frequency_cls = notification_type_cls.get_frequency(notification.recipient)
+
+            # User prefers digest delivery (not realtime)
+            if frequency_cls and not frequency_cls.is_realtime:
+                return
+
+        # Send immediately if channel supports realtime
+        if self.supports_realtime:
+            self.send_now(notification)
 
     def send_now(self, notification: "Notification") -> None:
         """
@@ -46,7 +65,7 @@ class NotificationChannel(ABC):
         raise NotImplementedError(f"{self.__class__.__name__} does not support realtime sending")
 
     def send_digest(
-        self, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
+        self, notifications: "QuerySet[Notification]", frequency: type[BaseFrequency] | None = None
     ) -> None:
         """
         Send a digest with specific notifications.
@@ -59,7 +78,7 @@ class NotificationChannel(ABC):
         raise NotImplementedError(f"{self.__class__.__name__} does not support digest sending")
 
 
-def register(cls: Type[NotificationChannel]) -> Type[NotificationChannel]:
+def register(cls: Type[BaseChannel]) -> Type[BaseChannel]:
     """
     Decorator that registers a NotificationChannel subclass.
 
@@ -80,7 +99,7 @@ def register(cls: Type[NotificationChannel]) -> Type[NotificationChannel]:
 
 
 @register
-class WebsiteChannel(NotificationChannel):
+class WebsiteChannel(BaseChannel):
     """
     Channel for displaying notifications on the website.
     Notifications are stored in the database and displayed in the UI.
@@ -88,17 +107,18 @@ class WebsiteChannel(NotificationChannel):
 
     key = "website"
     name = "Website"
+    supports_realtime = True
+    supports_digest = False
 
-    def process(self, notification: "Notification") -> None:
+    def send_now(self, notification: "Notification") -> None:
         """
         Website notifications are just stored in DB - no additional processing needed.
-        The notification was already created before channels are processed.
         """
         pass
 
 
 @register
-class EmailChannel(NotificationChannel):
+class EmailChannel(BaseChannel):
     """
     Channel for sending notifications via email.
     Supports both realtime delivery and daily digest batching.
@@ -106,22 +126,8 @@ class EmailChannel(NotificationChannel):
 
     key = "email"
     name = "Email"
+    supports_realtime = True
     supports_digest = True
-
-    def process(self, notification: "Notification") -> None:
-        """
-        Process email notification based on user's frequency preference.
-
-        Args:
-            notification: Notification instance to process
-        """
-        # Get notification type class from key
-        notification_type_cls = registry.get_type(notification.notification_type)
-        frequency_cls = notification_type_cls.get_email_frequency(notification.recipient)
-
-        # Send immediately if realtime, otherwise leave for digest
-        if frequency_cls and frequency_cls.is_realtime:
-            self.send_now(notification)
 
     def send_now(self, notification: "Notification") -> None:
         """
@@ -174,16 +180,13 @@ class EmailChannel(NotificationChannel):
             )
 
             # Mark as sent
-            notification.email_sent_at = timezone.now()
-            notification.save(update_fields=["email_sent_at"])
+            notification.mark_sent_on_channel(self.__class__)
 
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to send email for notification {notification.id}: {e}")
 
-    def send_digest(
-        self, notifications: "QuerySet[Notification]", frequency: type[NotificationFrequency] | None = None
-    ):
+    def send_digest(self, notifications: "QuerySet[Notification]", frequency: type[BaseFrequency] | None = None):
         """
         Send a digest email with specific notifications.
         This method is used by the management command.
@@ -258,7 +261,8 @@ class EmailChannel(NotificationChannel):
             )
 
             # Mark all as sent
-            notifications.update(email_sent_at=timezone.now())
+            for notification in notifications:
+                notification.mark_sent_on_channel(self.__class__)
 
         except Exception as e:
             logger = logging.getLogger(__name__)

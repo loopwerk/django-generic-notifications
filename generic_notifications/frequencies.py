@@ -4,9 +4,9 @@ from typing import Type
 from .registry import registry
 
 
-class NotificationFrequency(ABC):
+class BaseFrequency(ABC):
     """
-    Represents an email frequency option for notifications.
+    Represents a frequency option for notifications.
     """
 
     key: str
@@ -18,7 +18,7 @@ class NotificationFrequency(ABC):
         return self.name
 
 
-def register(cls: Type[NotificationFrequency]) -> Type[NotificationFrequency]:
+def register(cls: Type[BaseFrequency]) -> Type[BaseFrequency]:
     """
     Decorator that registers a NotificationFrequency subclass.
 
@@ -38,16 +38,16 @@ def register(cls: Type[NotificationFrequency]) -> Type[NotificationFrequency]:
 
 
 @register
-class RealtimeFrequency(NotificationFrequency):
+class RealtimeFrequency(BaseFrequency):
     key = "realtime"
     name = "Real-time"
     is_realtime = True
-    description = "Send emails immediately when notifications are created"
+    description = "Send immediately when notifications are created"
 
 
 @register
-class DailyFrequency(NotificationFrequency):
+class DailyFrequency(BaseFrequency):
     key = "daily"
     name = "Daily digest"
     is_realtime = False
-    description = "Bundle notifications into a daily email"
+    description = "Bundle notifications into a daily digest"

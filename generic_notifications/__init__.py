@@ -38,7 +38,7 @@ def send_notification(
     Raises:
         ValueError: If notification_type is not registered
     """
-    from .models import Notification
+    from .models import Notification, NotificationChannel
     from .registry import registry
 
     # Validate notification type is registered
@@ -62,13 +62,12 @@ def send_notification(
     if not enabled_channel_classes:
         return None
 
-    # Create the notification record with enabled channels
+    # Create the notification record
     notification = Notification(
         recipient=recipient,
         notification_type=notification_type.key,
         actor=actor,
         target=target,
-        channels=[channel_cls.key for channel_cls in enabled_channel_classes],
         subject=subject,
         text=text,
         url=url,
@@ -80,6 +79,13 @@ def send_notification(
     with transaction.atomic():
         if notification_type.should_save(notification):
             notification.save()
+
+            # Create NotificationChannel entries for each enabled channel
+            for channel_cls in enabled_channel_classes:
+                NotificationChannel.objects.create(
+                    notification=notification,
+                    channel=channel_cls.key,
+                )
 
             # Process through enabled channels only
             enabled_channel_instances = [channel_cls() for channel_cls in enabled_channel_classes]

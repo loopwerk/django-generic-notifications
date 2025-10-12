@@ -1,9 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from generic_notifications.channels import WebsiteChannel
-from generic_notifications.models import Notification
 from generic_notifications.utils import get_notifications
+
+from .test_helpers import create_notification_with_channels
 
 User = get_user_model()
 
@@ -14,19 +14,18 @@ class NotificationPerformanceTest(TestCase):
         self.actor = User.objects.create_user(username="actor", email="actor@example.com", password="testpass")
 
         for i in range(5):
-            Notification.objects.create(
-                recipient=self.user,
+            create_notification_with_channels(
+                user=self.user,
                 actor=self.actor,
                 notification_type="test_notification",
                 subject=f"Test notification {i}",
                 text=f"This is test notification {i}",
-                channels=[WebsiteChannel.key],
                 url=f"/notification/{i}/",
             )
 
     def test_get_notifications_queries(self):
         """Test the number of queries made by get_notifications"""
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(2):  # 1 for notifications + 1 for channels prefetch
             notifications = get_notifications(self.user)
             # Force evaluation of the queryset
             list(notifications)
@@ -62,18 +61,17 @@ class NotificationPerformanceTest(TestCase):
         """Test queries when accessing notification.target in template"""
         # Create notifications with targets
         for i in range(5):
-            Notification.objects.create(
-                recipient=self.user,
+            create_notification_with_channels(
+                user=self.user,
                 actor=self.actor,
                 notification_type="test_notification",
                 subject=f"Test notification {i}",
                 text=f"This is test notification {i}",
-                channels=[WebsiteChannel.key],
                 target=self.actor,
             )
 
         # First, evaluate the queryset
-        with self.assertNumQueries(2):  # 1 for notifications + 1 for targets
+        with self.assertNumQueries(3):  # 1 for notifications + 1 for channels prefetch + 1 for targets
             notifications = get_notifications(self.user)
             notifications_list = list(notifications)
 
@@ -88,27 +86,25 @@ class NotificationPerformanceTest(TestCase):
         # Create notifications where each has a different notification as its target
         for i in range(5):
             # Create the target notification
-            target_notification = Notification.objects.create(
-                recipient=self.actor,
+            target_notification = create_notification_with_channels(
+                user=self.actor,
                 notification_type="target_notification",
                 subject=f"Target notification {i}",
                 text=f"Target text {i}",
-                channels=[WebsiteChannel.key],
             )
 
             # Create notification pointing to it
-            Notification.objects.create(
-                recipient=self.user,
+            create_notification_with_channels(
+                user=self.user,
                 actor=self.actor,
                 notification_type="test_notification",
                 subject=f"Test notification {i}",
                 text=f"This is test notification {i}",
-                channels=[WebsiteChannel.key],
                 target=target_notification,
             )
 
         # First, evaluate the queryset
-        with self.assertNumQueries(2):  # 1 for notifications + 1 for targets
+        with self.assertNumQueries(3):  # 1 for notifications + 1 for channels prefetch + 1 for targets
             notifications = get_notifications(self.user)
             notifications_list = list(notifications)
 
@@ -124,27 +120,25 @@ class NotificationPerformanceTest(TestCase):
         # Create notifications where each has a different notification as its target
         for i in range(5):
             # Create the target notification
-            target_notification = Notification.objects.create(
-                recipient=self.actor,
+            target_notification = create_notification_with_channels(
+                user=self.actor,
                 notification_type="target_notification",
                 subject=f"Target notification {i}",
                 text=f"Target text {i}",
-                channels=[WebsiteChannel.key],
             )
 
             # Create notification pointing to it
-            Notification.objects.create(
-                recipient=self.user,
+            create_notification_with_channels(
+                user=self.user,
                 actor=self.actor,
                 notification_type="test_notification",
                 subject=f"Test notification {i}",
                 text=f"This is test notification {i}",
-                channels=[WebsiteChannel.key],
                 target=target_notification,
             )
 
         # First, evaluate the queryset
-        with self.assertNumQueries(3):  # 1 for notifications + 1 for targets + 1 for target recipients
+        with self.assertNumQueries(4):  # 1 for notifications + 1 for channels + 1 for targets + 1 for target recipients
             notifications = get_notifications(self.user).prefetch_related("target__recipient")
             notifications_list = list(notifications)
 

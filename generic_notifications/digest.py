@@ -4,7 +4,7 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 
-from .frequencies import NotificationFrequency
+from .frequencies import BaseFrequency
 from .models import Notification
 from .registry import registry
 from .types import NotificationType
@@ -14,29 +14,22 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-def send_digest_notifications(frequency_key: str, dry_run: bool = False) -> int:
+def send_notification_digests(frequency: type[BaseFrequency], dry_run: bool = False) -> int:
     """
-    Send digest notifications for a specific frequency across all channels that support digests.
+    Send notification digests for a specific frequency across all channels that support digests.
 
     Args:
-        frequency_key: The frequency key to process (e.g., 'daily', 'weekly')
+        frequency: The frequency class to process (e.g., DailyFrequency, WeeklyFrequency)
         dry_run: If True, don't actually send notifications, just log what would be sent
 
     Returns:
         Total number of digests sent across all channels
 
     Raises:
-        KeyError: If the frequency key is not found
         ValueError: If the frequency is realtime (not a digest frequency)
     """
-    # Get the specific frequency (required argument)
-    try:
-        frequency_cls = registry.get_frequency(frequency_key)
-    except KeyError:
-        raise KeyError(f"Frequency '{frequency_key}' not found")
-
-    if frequency_cls.is_realtime:
-        raise ValueError(f"Frequency '{frequency_key}' is realtime, not a digest frequency")
+    if frequency.is_realtime:
+        raise ValueError(f"Frequency '{frequency.key}' is realtime, not a digest frequency")
 
     # Get all channels that support digest functionality
     digest_channels = [channel_cls() for channel_cls in registry.get_all_channels() if channel_cls.supports_digest]
@@ -45,13 +38,13 @@ def send_digest_notifications(frequency_key: str, dry_run: bool = False) -> int:
         logger.warning("No channels support digest functionality")
         return 0
 
-    logger.info(f"Processing {frequency_cls.name} digests for {len(digest_channels)} channel(s)...")
+    logger.info(f"Processing {frequency.name} digests for {len(digest_channels)} channel(s)...")
 
     all_notification_types = registry.get_all_types()
     total_digests_sent = 0
 
     for channel in digest_channels:
-        channel_digests_sent = _send_digest_for_channel(channel, frequency_cls, all_notification_types, dry_run)
+        channel_digests_sent = _send_digest_for_channel(channel, frequency, all_notification_types, dry_run)
         total_digests_sent += channel_digests_sent
 
         if dry_run:
@@ -64,7 +57,7 @@ def send_digest_notifications(frequency_key: str, dry_run: bool = False) -> int:
 
 def _send_digest_for_channel(
     channel: Any,
-    frequency_cls: type[NotificationFrequency],
+    frequency_cls: type[BaseFrequency],
     all_notification_types: list[type[NotificationType]],
     dry_run: bool,
 ) -> int:
@@ -82,9 +75,9 @@ def _send_digest_for_channel(
     """
     # Find all users who have unsent, unread notifications for this channel
     users_with_notifications = User.objects.filter(
-        notifications__email_sent_at__isnull=True,  # TODO: This should be channel-agnostic
         notifications__read__isnull=True,
-        notifications__channels__icontains=f'"{channel.key}"',
+        notifications__channels__channel=channel.key,
+        notifications__channels__sent_at__isnull=True,
     ).distinct()
 
     digests_sent = 0
@@ -102,9 +95,9 @@ def _send_digest_for_channel(
         notifications = Notification.objects.filter(
             recipient=user,
             notification_type__in=relevant_type_keys,
-            email_sent_at__isnull=True,  # TODO: This should be channel-agnostic
             read__isnull=True,
-            channels__icontains=f'"{channel.key}"',
+            channels__channel=channel.key,
+            channels__sent_at__isnull=True,
         ).order_by("-added")
 
         if notifications.exists():
@@ -128,7 +121,7 @@ def _send_digest_for_channel(
 
 def _get_notification_types_for_frequency(
     user: AbstractUser,
-    wanted_frequency: type[NotificationFrequency],
+    wanted_frequency: type[BaseFrequency],
     all_notification_types: list[type[NotificationType]],
 ) -> list[type[NotificationType]]:
     """
@@ -147,7 +140,7 @@ def _get_notification_types_for_frequency(
     relevant_types: list[type[NotificationType]] = []
 
     for notification_type in all_notification_types:
-        user_frequency = notification_type.get_email_frequency(user)  # TODO: This should be channel-agnostic
+        user_frequency = notification_type.get_frequency(user)
         if user_frequency.key == wanted_frequency.key:
             relevant_types.append(notification_type)
 

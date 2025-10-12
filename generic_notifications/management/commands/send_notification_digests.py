@@ -2,19 +2,20 @@ import logging
 
 from django.core.management.base import BaseCommand
 
-from generic_notifications.digest import send_digest_notifications
+from generic_notifications.digest import send_notification_digests
+from generic_notifications.registry import registry
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Send digest emails to users who have opted for digest delivery"
+    help = "Send notification digests to users who have opted for digest delivery"
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Show what would be sent without actually sending emails",
+            help="Show what would be sent without actually sending the digests",
         )
         parser.add_argument(
             "--frequency",
@@ -35,7 +36,12 @@ class Command(BaseCommand):
             logger.info("DRY RUN - No notifications will be sent")
 
         try:
-            total_digests_sent = send_digest_notifications(target_frequency, dry_run)
+            # Get the frequency class from the registry
+            frequency_cls = registry.get_frequency(target_frequency)
+            if not frequency_cls:
+                raise KeyError(f"Frequency '{target_frequency}' not found")
+
+            total_digests_sent = send_notification_digests(frequency_cls, dry_run)
 
             if dry_run:
                 logger.info(f"DRY RUN: Would have sent {total_digests_sent} digest notifications")

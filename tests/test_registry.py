@@ -1,7 +1,7 @@
 from django.test import TestCase
 
-from generic_notifications.channels import NotificationChannel
-from generic_notifications.frequencies import NotificationFrequency
+from generic_notifications.channels import BaseChannel
+from generic_notifications.frequencies import BaseFrequency
 from generic_notifications.registry import NotificationRegistry
 from generic_notifications.types import NotificationType
 
@@ -38,28 +38,28 @@ class NotificationTypeTest(TestCase):
         self.assertEqual(str(notification_type), "Test Name")
 
 
-class TestRealtimeFrequency(NotificationFrequency):
+class TestRealtimeFrequency(BaseFrequency):
     key = "realtime"
     name = "Realtime"
     is_realtime = True
     description = ""
 
 
-class TestDailyFrequency(NotificationFrequency):
+class TestDailyFrequency(BaseFrequency):
     key = "daily"
     name = "Daily"
     is_realtime = False
     description = ""
 
 
-class TestWeeklyFrequency(NotificationFrequency):
+class TestWeeklyFrequency(BaseFrequency):
     key = "weekly"
     name = "Weekly"
     is_realtime = False
     description = "Once per week"
 
 
-class TestDefaultFrequency(NotificationFrequency):
+class TestDefaultFrequency(BaseFrequency):
     key = "test"
     name = "Test"
     is_realtime = False
@@ -125,7 +125,7 @@ class NotificationRegistryTest(TestCase):
         self.assertIn("Must register a NotificationType subclass", str(cm.exception))
 
     def test_register_channel(self):
-        class TestChannel(NotificationChannel):
+        class TestChannel(BaseChannel):
             key = "test"
             name = "Test"
 
@@ -144,7 +144,7 @@ class NotificationRegistryTest(TestCase):
         with self.assertRaises(ValueError) as cm:
             self.registry.register_channel("not_a_channel_object")  # type: ignore[arg-type]
 
-        self.assertIn("Must register a NotificationChannel subclass", str(cm.exception))
+        self.assertIn("Must register a BaseChannel subclass", str(cm.exception))
 
     def test_register_frequency(self):
         self.registry.register_frequency(TestDailyFrequency)
@@ -159,7 +159,7 @@ class NotificationRegistryTest(TestCase):
         with self.assertRaises(ValueError) as cm:
             self.registry.register_frequency("not_a_frequency_object")  # type: ignore[arg-type]
 
-        self.assertIn("Must register a NotificationFrequency subclass", str(cm.exception))
+        self.assertIn("Must register a BaseFrequency subclass", str(cm.exception))
 
     def test_get_nonexistent_items(self):
         with self.assertRaises(KeyError):
@@ -210,7 +210,7 @@ class NotificationRegistryTest(TestCase):
         self.assertFalse(result)
 
     def test_unregister_channel(self):
-        class TestChannel(NotificationChannel):
+        class TestChannel(BaseChannel):
             key = "test"
             name = "Test"
 
@@ -231,7 +231,7 @@ class NotificationRegistryTest(TestCase):
         self.assertEqual(len(self.registry.get_all_channels()), 0)
 
     def test_unregister_channel_nonexistent(self):
-        class NonexistentChannel(NotificationChannel):
+        class NonexistentChannel(BaseChannel):
             key = "nonexistent"
             name = "Nonexistent Channel"
 
@@ -256,7 +256,7 @@ class NotificationRegistryTest(TestCase):
         self.assertEqual(len(self.registry.get_all_frequencies()), 0)
 
     def test_unregister_frequency_nonexistent(self):
-        class NonexistentFrequency(NotificationFrequency):
+        class NonexistentFrequency(BaseFrequency):
             key = "nonexistent"
             name = "Nonexistent Frequency"
             is_realtime = False
@@ -292,14 +292,14 @@ class NotificationRegistryTest(TestCase):
             self.registry.get_type("type2")
 
     def test_clear_channels(self):
-        class Channel1(NotificationChannel):
+        class Channel1(BaseChannel):
             key = "channel1"
             name = "Channel 1"
 
             def process(self, notification):
                 pass
 
-        class Channel2(NotificationChannel):
+        class Channel2(BaseChannel):
             key = "channel2"
             name = "Channel 2"
 
@@ -322,13 +322,13 @@ class NotificationRegistryTest(TestCase):
             self.registry.get_channel("channel2")
 
     def test_clear_frequencies(self):
-        class Freq1(NotificationFrequency):
+        class Freq1(BaseFrequency):
             key = "freq1"
             name = "Frequency 1"
             is_realtime = False
             description = ""
 
-        class Freq2(NotificationFrequency):
+        class Freq2(BaseFrequency):
             key = "freq2"
             name = "Frequency 2"
             is_realtime = False

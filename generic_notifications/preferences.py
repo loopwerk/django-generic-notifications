@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 
 from django.contrib.auth.models import AbstractUser
 
-from .models import DisabledNotificationTypeChannel, EmailFrequency
+from .models import DisabledNotificationTypeChannel, NotificationFrequency
 from .registry import registry
 
 
@@ -13,7 +13,7 @@ def get_notification_preferences(user: "AbstractUser") -> List[Dict[str, Any]]:
     Returns a list of dictionaries, each containing:
     - notification_type: The NotificationType instance
     - channels: Dict of channel_key -> {channel, enabled, required}
-    - email_frequency: The current email frequency key for this type
+    - notification_frequency: The current notification frequency key for this type
 
     This data structure can be used directly in templates to render
     notification preference forms.
@@ -26,8 +26,10 @@ def get_notification_preferences(user: "AbstractUser") -> List[Dict[str, Any]]:
         DisabledNotificationTypeChannel.objects.filter(user=user).values_list("notification_type", "channel")
     )
 
-    # Get user's email frequency preferences
-    email_frequencies = dict(EmailFrequency.objects.filter(user=user).values_list("notification_type", "frequency"))
+    # Get user's notification frequency preferences
+    notification_frequencies = dict(
+        NotificationFrequency.objects.filter(user=user).values_list("notification_type", "frequency")
+    )
 
     # Build settings data structure
     settings_data = []
@@ -36,7 +38,7 @@ def get_notification_preferences(user: "AbstractUser") -> List[Dict[str, Any]]:
         type_data: Dict[str, Any] = {
             "notification_type": notification_type,
             "channels": {},
-            "email_frequency": email_frequencies.get(type_key, notification_type.default_email_frequency.key),
+            "notification_frequency": notification_frequencies.get(type_key, notification_type.default_frequency.key),
         }
 
         for channel in channels.values():
@@ -61,14 +63,14 @@ def save_notification_preferences(user: "AbstractUser", form_data: Dict[str, Any
 
     Expected form_data format:
     - For channels: "{notification_type_key}__{channel_key}" -> "on" (if enabled)
-    - For email frequencies: "{notification_type_key}__frequency" -> frequency_key
+    - For notification frequencies: "{notification_type_key}__frequency" -> frequency_key
 
     This function implements an opt-out model: channels are enabled by default
     and only disabled entries are stored in the database.
     """
     # Clear existing preferences to rebuild from form data
     DisabledNotificationTypeChannel.objects.filter(user=user).delete()
-    EmailFrequency.objects.filter(user=user).delete()
+    NotificationFrequency.objects.filter(user=user).delete()
 
     notification_types = {nt.key: nt for nt in registry.get_all_types()}
     channels = {ch.key: ch for ch in registry.get_all_channels()}
@@ -91,13 +93,12 @@ def save_notification_preferences(user: "AbstractUser", form_data: Dict[str, Any
             if form_key not in form_data:
                 notification_type.disable_channel(user=user, channel=channel)
 
-        # Handle email frequency preference
-        if "email" in [ch.key for ch in channels.values()]:
-            frequency_key = f"{type_key}__frequency"
-            if frequency_key in form_data:
-                frequency_value = form_data[frequency_key]
-                if frequency_value in frequencies:
-                    frequency_obj = frequencies[frequency_value]
-                    # Only save if different from default
-                    if frequency_value != notification_type.default_email_frequency.key:
-                        notification_type.set_email_frequency(user=user, frequency=frequency_obj)
+        # Handle notification frequency preference
+        frequency_key = f"{type_key}__frequency"
+        if frequency_key in form_data:
+            frequency_value = form_data[frequency_key]
+            if frequency_value in frequencies:
+                frequency_obj = frequencies[frequency_value]
+                # Only save if different from default
+                if frequency_value != notification_type.default_frequency.key:
+                    notification_type.set_frequency(user=user, frequency=frequency_obj)
