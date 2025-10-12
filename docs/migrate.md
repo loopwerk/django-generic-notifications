@@ -1,6 +1,6 @@
 # Migrate from v1 to v2
 
-Version two of django-generic-notifications has [a lot of improvements](https://github.com/loopwerk/django-generic-notifications/releases/tag/2.0.0), and some breaking changes in order to better support non-email digest channels. Most of these breaking changes will only affect you if you're writing custom channels or frequencies. If you only added custom notification types, then most changes won't affect you.
+Version 2.0.0 of django-generic-notifications has [a lot of improvements](https://github.com/loopwerk/django-generic-notifications/releases/tag/2.0.0), and some breaking changes in order to better support non-email digest channels. Most of these breaking changes will only affect you if you've written custom channels or frequencies. If you only added custom notification types, then most changes won't affect you.
 
 ## Renamed classes and methods
 
