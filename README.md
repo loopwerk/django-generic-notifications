@@ -140,10 +140,6 @@ from generic_notifications.frequencies import DailyFrequency
 send_notification_digests(frequency=DailyFrequency, dry_run=False)
 ```
 
-## Admin Integration
-
-While the library doesn't register admin classes by default, the [example app](#example-app) includes [admin configuration](https://github.com/loopwerk/django-generic-notifications/tree/main/example/notifications/admin.py) that you can copy into your project for debugging and monitoring purposes.
-
 ## Example App
 
 An example app is provided, which shows how to create a custom notification type, how to send a notification, it has a nice looking notification center with unread notifications as well as an archive of all read notifications, plus a settings view where you can manage notification preferences.
@@ -155,6 +151,10 @@ uv run ./manage.py runserver
 ```
 
 Then open http://127.0.0.1:8000/.
+
+## Admin Integration
+
+While the library doesn't register admin classes by default, the example app includes [admin configuration](https://github.com/loopwerk/django-generic-notifications/tree/main/example/notifications/admin.py) that you can copy into your project for debugging and monitoring purposes.
 
 ## Further Documentation
 
