@@ -270,6 +270,7 @@ class NotificationFrequency(models.Model):
 
     class Meta:
         unique_together = ["user", "notification_type"]
+        verbose_name_plural = "Notification frequencies"
 
     def clean(self):
         if self.notification_type:

@@ -10,13 +10,17 @@ def migrate_channels_to_notificationchannel(apps, schema_editor):
     NotificationChannel = apps.get_model("generic_notifications", "NotificationChannel")
 
     for notification in Notification.objects.all():
+        # Access the channels_old JSONField (renamed to avoid conflict)
+        channels_data = notification.channels_old if hasattr(notification, "channels_old") else []
+
         # Create NotificationChannel entries for each channel
-        for channel in notification.channels:
+        for channel in channels_data:
             delivery, created = NotificationChannel.objects.get_or_create(
                 notification=notification,
                 channel=channel,
             )
 
+            # If this is the email channel and email_sent_at is set, update sent_at
             if notification.email_sent_at:
                 delivery.sent_at = notification.email_sent_at
                 delivery.save()
@@ -29,12 +33,12 @@ def reverse_migrate_channels(apps, schema_editor):
 
     for notification in Notification.objects.all():
         # Rebuild channels list from NotificationChannel entries
-        channels = list(notification.channels.values_list("channel", flat=True))
-        notification.channels = channels
+        channels = list(NotificationChannel.objects.filter(notification=notification).values_list("channel", flat=True))
+        notification.channels_old = channels
 
         # Restore email_sent_at from email NotificationChannel
         try:
-            email_delivery = notification.channels.get(channel="email")
+            email_delivery = NotificationChannel.objects.get(notification=notification, channel="email")
             if email_delivery.sent_at:
                 notification.email_sent_at = email_delivery.sent_at
         except NotificationChannel.DoesNotExist:
@@ -49,6 +53,13 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # First, rename the channels field to avoid naming conflict with the related_name
+        migrations.RenameField(
+            model_name="notification",
+            old_name="channels",
+            new_name="channels_old",
+        ),
+        # Create the new NotificationChannel model
         migrations.CreateModel(
             name="NotificationChannel",
             fields=[
@@ -72,8 +83,15 @@ class Migration(migrations.Migration):
                 "unique_together": {("notification", "channel")},
             },
         ),
+        # Migrate the data
         migrations.RunPython(
             migrate_channels_to_notificationchannel,
             reverse_migrate_channels,
+        ),
+        # Rename back to channels for migration 3 to handle removal
+        migrations.RenameField(
+            model_name="notification",
+            old_name="channels_old",
+            new_name="channels",
         ),
     ]

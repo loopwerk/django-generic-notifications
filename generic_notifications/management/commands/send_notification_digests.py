@@ -40,7 +40,7 @@ class Command(BaseCommand):
             frequency_cls = registry.get_frequency(target_frequency)
             if not frequency_cls:
                 raise KeyError(f"Frequency '{target_frequency}' not found")
-            
+
             total_digests_sent = send_notification_digests(frequency_cls, dry_run)
 
             if dry_run:
