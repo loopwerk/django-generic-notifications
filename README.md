@@ -151,6 +151,7 @@ Then open http://127.0.0.1:8000/.
 
 ## Further Documentation
 
+- [Migrate to a newer version of this library](https://github.com/loopwerk/django-generic-notifications/tree/main/docs/migrate.md)
 - [Customization: custom channels, frequencies, and email templates](https://github.com/loopwerk/django-generic-notifications/tree/main/docs/customizing.md)
 - [Performance considerations and tips](https://github.com/loopwerk/django-generic-notifications/tree/main/docs/performance.md)
 - [Notification grouping: prevent notification spam by grouping similar notifications together](https://github.com/loopwerk/django-generic-notifications/tree/main/docs/grouping.md)
