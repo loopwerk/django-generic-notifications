@@ -18,7 +18,7 @@ class NotificationQuerySet(models.QuerySet):
 
     def prefetch(self):
         """Prefetch related objects"""
-        qs = self.select_related("recipient", "actor")
+        qs = self.select_related("recipient", "actor").prefetch_related("channels")
 
         # Only add target prefetching on Django 5.0+ due to GenericForeignKey limitations
         if django.VERSION >= (5, 0):

@@ -25,7 +25,7 @@ class NotificationPerformanceTest(TestCase):
 
     def test_get_notifications_queries(self):
         """Test the number of queries made by get_notifications"""
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(2):  # 1 for notifications + 1 for channels prefetch
             notifications = get_notifications(self.user)
             # Force evaluation of the queryset
             list(notifications)
@@ -71,7 +71,7 @@ class NotificationPerformanceTest(TestCase):
             )
 
         # First, evaluate the queryset
-        with self.assertNumQueries(2):  # 1 for notifications + 1 for targets
+        with self.assertNumQueries(3):  # 1 for notifications + 1 for channels prefetch + 1 for targets
             notifications = get_notifications(self.user)
             notifications_list = list(notifications)
 
@@ -104,7 +104,7 @@ class NotificationPerformanceTest(TestCase):
             )
 
         # First, evaluate the queryset
-        with self.assertNumQueries(2):  # 1 for notifications + 1 for targets
+        with self.assertNumQueries(3):  # 1 for notifications + 1 for channels prefetch + 1 for targets
             notifications = get_notifications(self.user)
             notifications_list = list(notifications)
 
@@ -138,7 +138,7 @@ class NotificationPerformanceTest(TestCase):
             )
 
         # First, evaluate the queryset
-        with self.assertNumQueries(3):  # 1 for notifications + 1 for targets + 1 for target recipients
+        with self.assertNumQueries(4):  # 1 for notifications + 1 for channels + 1 for targets + 1 for target recipients
             notifications = get_notifications(self.user).prefetch_related("target__recipient")
             notifications_list = list(notifications)
 
