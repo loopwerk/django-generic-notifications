@@ -84,6 +84,24 @@ class NotificationChannelTest(TestCase):
         # But enabled for other types
         self.assertTrue(OtherNotificationType.is_channel_enabled(self.user, TestChannel))
 
+    def test_digest_only_channel_never_sends_immediately(self):
+        """Test that channels with supports_realtime=False never send immediately."""
+
+        class DigestOnlyChannel(BaseChannel):
+            key = "digest_only"
+            name = "Digest Only"
+            supports_realtime = False
+            supports_digest = True
+
+            def send_now(self, notification):
+                raise AssertionError("send_now should never be called for digest-only channel")
+
+        channel = DigestOnlyChannel()
+        notification = Notification.objects.create(recipient=self.user, notification_type="test_type", subject="Test")
+
+        # Process should not call send_now (would raise AssertionError if it did)
+        channel.process(notification)
+
 
 class WebsiteChannelTest(TestCase):
     def setUp(self):

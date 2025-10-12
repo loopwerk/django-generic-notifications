@@ -22,27 +22,36 @@ class BaseChannel(ABC):
 
     key: str
     name: str
+    supports_realtime: bool = True
     supports_digest: bool = False
 
     def process(self, notification: "Notification") -> None:
         """
-        Process a notification through this channel.
-        For digest-supporting channels, this checks frequency preference.
-        For non-digest channels, this sends immediately.
+        Process a notification through this channel based on channel capabilities
+        and user preferences. If the notification should be handled realtime,
+        then call `send_now`. If it should be handled in a digest delivery,
+        then do nothing, as the send_notification_digests function/command will
+        pick it up.
 
         Args:
             notification: Notification instance to process
         """
+        # Digest-only channels: never send immediately
+        if self.supports_digest and not self.supports_realtime:
+            return
+
+        # Channels that support both: check user preference
         if self.supports_digest:
             # Get notification type class from key
             notification_type_cls = registry.get_type(notification.notification_type)
             frequency_cls = notification_type_cls.get_frequency(notification.recipient)
 
-            # Send immediately if realtime, otherwise leave for digest
-            if frequency_cls and frequency_cls.is_realtime:
-                self.send_now(notification)
-        else:
-            # Non-digest channels always send immediately
+            # User prefers digest delivery (not realtime)
+            if frequency_cls and not frequency_cls.is_realtime:
+                return
+
+        # Send immediately if channel supports realtime
+        if self.supports_realtime:
             self.send_now(notification)
 
     def send_now(self, notification: "Notification") -> None:
@@ -98,6 +107,8 @@ class WebsiteChannel(BaseChannel):
 
     key = "website"
     name = "Website"
+    supports_realtime = True
+    supports_digest = False
 
     def send_now(self, notification: "Notification") -> None:
         """
@@ -115,6 +126,7 @@ class EmailChannel(BaseChannel):
 
     key = "email"
     name = "Email"
+    supports_realtime = True
     supports_digest = True
 
     def send_now(self, notification: "Notification") -> None:
