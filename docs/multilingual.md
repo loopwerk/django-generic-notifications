@@ -84,7 +84,7 @@ send_notification(
 ```
 
 **Pros**: Always current data, minimal storage, simpler code  
-**Cons**: Requires proper prefetching for performance
+**Cons**: Requires proper prefetching for [performance](https://github.com/loopwerk/django-generic-notifications/blob/main/docs/performance.md)
 
 ### Performance considerations
 
