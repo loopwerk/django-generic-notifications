@@ -1,4 +1,3 @@
-import django
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -18,13 +17,7 @@ class NotificationQuerySet(models.QuerySet):
 
     def prefetch(self):
         """Prefetch related objects"""
-        qs = self.select_related("recipient", "actor").prefetch_related("channels")
-
-        # Only add target prefetching on Django 5.0+ due to GenericForeignKey limitations
-        if django.VERSION >= (5, 0):
-            qs = qs.prefetch_related("target")
-
-        return qs
+        return self.select_related("recipient", "actor")
 
     def for_channel(self, channel: type[BaseChannel] = WebsiteChannel):
         """Filter notifications by channel"""

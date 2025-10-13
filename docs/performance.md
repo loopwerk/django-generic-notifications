@@ -4,9 +4,14 @@
 
 The `target` field is a GenericForeignKey that can point to any Django model instance. While convenient, accessing targets requires careful consideration for performance.
 
-When using Django 5.0+, this library automatically includes `.prefetch_related("target")` when using the standard query methods. This efficiently fetches target objects, but only the _direct_ targets - accessing relationships _through_ the target will still cause additional queries.
+By default, the library does **not** prefetch targets to avoid unnecessary queries when they're not needed. If you need to access the target field, you should explicitly prefetch it:
 
-_On Django 4.2, you'll need to manually deal with prefetching the `target` relationship._
+```python
+# Add target prefetch when needed
+notifications = get_notifications(user).prefetch_related("target")
+```
+
+Note that this only fetches the _direct_ targets - accessing relationships _through_ the target will still cause additional queries.
 
 Consider this problematic example that will cause N+1 queries:
 
@@ -37,10 +42,10 @@ class CommentNotificationType(NotificationType):
         return f'{actor_name} commented on your article "{article.title}": "{comment_text}"'
 ```
 
-When displaying a list of 10 notifications, this will execute:
+When displaying a list of 10 notifications, with `.prefetch_related("target")` applied, this will execute:
 
 - 1 query for the notifications
-- 1 query for the target comments (Django 5.0+ only, automatically prefetched)
+- 1 query for the target comments
 - 10 queries for the articles (N+1 problem!)
 
 #### Solution 1: store data in the notification
@@ -59,15 +64,14 @@ send_notification(
 )
 ```
 
-However, this only works if you don’t need to dynamically generate the text - for example to make sure the text is always up to date, or to deal with internationalization.
+However, this only works if you don’t need to dynamically generate the text - for example to make sure the text is always up to date, or to deal with [internationalization](https://github.com/loopwerk/django-generic-notifications/blob/main/docs/multilingual.md).
 
 #### Solution 2: prefetch deeper relationships
 
 If you must access relationships through the target, you can prefetch them:
 
 ```python
-# On Django 5.0+ the library already prefetches targets,
-# but you need to add deeper relationships yourself
+# Prefetch the article relationship through target
 notifications = get_notifications(user).prefetch_related(
     "target__article"  # This prevents the N+1 problem
 )
