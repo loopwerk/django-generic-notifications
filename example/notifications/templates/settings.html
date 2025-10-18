@@ -41,9 +41,9 @@
                            name="{{ type_data.notification_type.key }}__{{ channel_key }}"
                            class="checkbox checkbox-primary"
                            {% if channel_data.enabled %}checked{% endif %}
-                           {% if channel_data.required %}disabled{% endif %}
-                           {% if channel_key == 'email' %}@change="emailEnabled = $event.target.checked"{% endif %}
-                           {% if channel_data.required %}title="Required"{% endif %} />
+                           {% if channel_data.forbidden %}disabled title="Forbidden"{% endif %}
+                           {% if channel_data.required %}disabled title="Required"{% endif %}
+                           {% if channel_key == 'email' %}@change="emailEnabled = $event.target.checked"{% endif %} />
                   {% endwith %}
                 </td>
               {% endfor %}

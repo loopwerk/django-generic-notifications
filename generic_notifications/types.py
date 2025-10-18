@@ -19,6 +19,7 @@ class NotificationType(ABC):
     description: str
     default_frequency: Type[BaseFrequency] = DailyFrequency
     required_channels: list[Type[BaseChannel]] = []
+    forbidden_channels: list[Type[BaseChannel]] = []
 
     def __str__(self) -> str:
         return self.name
@@ -117,10 +118,13 @@ class NotificationType(ABC):
             )
         )
 
-        # Filter out disabled channels
+        # Get all forbidden channel keys
+        forbidden_channel_keys = {channel_cls.key for channel_cls in cls.forbidden_channels}
+
+        # Filter out disabled and forbidden channels
         enabled_channels = []
         for channel_cls in registry.get_all_channels():
-            if channel_cls.key not in disabled_channel_keys:
+            if channel_cls.key not in disabled_channel_keys and channel_cls.key not in forbidden_channel_keys:
                 enabled_channels.append(channel_cls)
 
         return enabled_channels

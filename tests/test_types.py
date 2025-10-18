@@ -213,3 +213,56 @@ class NotificationTypeTest(TestCase):
         # Getting frequency should now return the default
         frequency_cls = TestNotificationType.get_frequency(self.user)
         self.assertEqual(frequency_cls, TestNotificationType.default_frequency)
+
+
+class ForbiddenChannelsNotificationType(NotificationType):
+    key = "forbidden_test_type"
+    name = "Forbidden Test Type"
+    description = "A test notification type with forbidden channels"
+    forbidden_channels = [WebsiteChannel]
+
+
+class TestForbiddenChannels(TestCase):
+    user: Any
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create_user(
+            username="forbidden_test", email="forbidden@example.com", password="testpass"
+        )
+        registry.register_type(ForbiddenChannelsNotificationType)
+
+    def test_forbidden_channels_not_in_enabled_channels(self):
+        """Test that forbidden channels are not included in get_enabled_channels"""
+        enabled_channels = ForbiddenChannelsNotificationType.get_enabled_channels(self.user)
+        enabled_channel_keys = [ch.key for ch in enabled_channels]
+
+        # Website channel should not be in enabled channels
+        self.assertNotIn(WebsiteChannel.key, enabled_channel_keys)
+        # Email channel should still be enabled
+        self.assertIn(EmailChannel.key, enabled_channel_keys)
+
+    def test_forbidden_channels_filtered_even_when_explicitly_enabled(self):
+        """Test that forbidden channels are filtered out even if user tries to enable them"""
+        # Try to enable the forbidden channel (this should have no effect)
+        ForbiddenChannelsNotificationType.enable_channel(self.user, WebsiteChannel)
+
+        enabled_channels = ForbiddenChannelsNotificationType.get_enabled_channels(self.user)
+        enabled_channel_keys = [ch.key for ch in enabled_channels]
+
+        # Website channel should still not be in enabled channels
+        self.assertNotIn(WebsiteChannel.key, enabled_channel_keys)
+
+    def test_forbidden_channels_filtered_when_not_disabled(self):
+        """Test that forbidden channels are filtered out regardless of disabled state"""
+        # Ensure no disabled entry exists for the forbidden channel
+        DisabledNotificationTypeChannel.objects.filter(
+            user=self.user, notification_type=ForbiddenChannelsNotificationType.key, channel=WebsiteChannel.key
+        ).delete()
+
+        enabled_channels = ForbiddenChannelsNotificationType.get_enabled_channels(self.user)
+        enabled_channel_keys = [ch.key for ch in enabled_channels]
+
+        # Website channel should still not be in enabled channels
+        self.assertNotIn(WebsiteChannel.key, enabled_channel_keys)

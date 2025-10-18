@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from generic_notifications import send_notification
-from generic_notifications.channels import WebsiteChannel
+from generic_notifications.channels import EmailChannel, WebsiteChannel
 from generic_notifications.models import Notification
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
@@ -121,6 +121,47 @@ class SendNotificationTest(TestCase):
         self.assertIn("website", channel_keys)
         self.assertIn("email", channel_keys)
         self.assertEqual(len(channel_keys), 2)
+
+    def test_send_notification_with_disabled_channel(self):
+        # Disable website channel for this user
+        self.notification_type.disable_channel(self.user, WebsiteChannel)
+
+        notification = send_notification(recipient=self.user, notification_type=self.notification_type)
+
+        # Notification should only have email channel
+        self.assertIsNotNone(notification)
+        channel_keys = notification.get_channels()
+        self.assertNotIn("website", channel_keys)
+        self.assertIn("email", channel_keys)
+        self.assertEqual(len(channel_keys), 1)
+
+    def test_send_notification_with_all_channels_disabled(self):
+        # Disable both channels for this user
+        self.notification_type.disable_channel(self.user, WebsiteChannel)
+        self.notification_type.disable_channel(self.user, EmailChannel)
+
+        notification = send_notification(recipient=self.user, notification_type=self.notification_type)
+
+        # Should return None when no channels are enabled
+        self.assertIsNone(notification)
+
+    def test_send_notification_with_forbidden_channels(self):
+        # Create a notification type with forbidden channels
+        class ForbiddenTestType(NotificationType):
+            key = "forbidden_test"
+            name = "Forbidden Test"
+            forbidden_channels = [WebsiteChannel]
+
+        registry.register_type(ForbiddenTestType)
+
+        notification = send_notification(recipient=self.user, notification_type=ForbiddenTestType)
+
+        # Should only have email channel (website is forbidden)
+        self.assertIsNotNone(notification)
+        channel_keys = notification.get_channels()
+        self.assertNotIn("website", channel_keys)
+        self.assertIn("email", channel_keys)
+        self.assertEqual(len(channel_keys), 1)
 
 
 class MarkNotificationsAsReadTest(TestCase):

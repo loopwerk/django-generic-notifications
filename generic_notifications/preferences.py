@@ -45,11 +45,13 @@ def get_notification_preferences(user: "AbstractUser") -> List[Dict[str, Any]]:
             channel_key = channel.key
             is_disabled = (type_key, channel_key) in disabled_channels
             is_required = channel_key in [ch.key for ch in notification_type.required_channels]
+            is_forbidden = channel_key in [ch.key for ch in notification_type.forbidden_channels]
 
             type_data["channels"][channel_key] = {
                 "channel": channel,
-                "enabled": is_required or not is_disabled,  # Required channels are always enabled
+                "enabled": not is_forbidden and (is_required or not is_disabled),
                 "required": is_required,
+                "forbidden": is_forbidden,
             }
 
         settings_data.append(type_data)
@@ -85,8 +87,10 @@ def save_notification_preferences(user: "AbstractUser", form_data: Dict[str, Any
             channel_key = channel.key
             form_key = f"{type_key}__{channel_key}"
 
-            # Check if this channel is required (cannot be disabled)
+            # Check if this channel is required or forbidden (cannot be changed)
             if channel_key in [ch.key for ch in notification_type.required_channels]:
+                continue
+            if channel_key in [ch.key for ch in notification_type.forbidden_channels]:
                 continue
 
             # If checkbox not checked, create disabled entry
