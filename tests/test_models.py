@@ -53,6 +53,32 @@ class NotificationTypeChannelPreferenceModelTest(TestCase):
         # Register test notification types and import channels for validation
         registry.register_type(TestNotificationType)
 
+    def test_clean_with_invalid_notification_type(self):
+        disabled = NotificationTypeChannelPreference(
+            user=self.user,
+            notification_type="invalid_type",
+            channel=WebsiteChannel.key,
+            enabled=False,
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            disabled.clean()
+
+        self.assertIn("Unknown notification type: invalid_type", str(cm.exception))
+
+    def test_clean_with_invalid_channel(self):
+        disabled = NotificationTypeChannelPreference(
+            user=self.user,
+            notification_type=TestNotificationType.key,
+            channel="invalid_channel",
+            enabled=False,
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            disabled.clean()
+
+        self.assertIn("Unknown channel: invalid_channel", str(cm.exception))
+
     def test_clean_prevents_disabling_required_channel(self):
         """Test that users cannot disable required channels for notification types"""
         preference = NotificationTypeChannelPreference(
