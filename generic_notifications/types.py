@@ -20,6 +20,7 @@ class NotificationType(ABC):
     default_frequency: Type[BaseFrequency] = DailyFrequency
     required_channels: list[Type[BaseChannel]] = []
     forbidden_channels: list[Type[BaseChannel]] = []
+    default_channels: list[Type[BaseChannel]] | None = None
 
     def __str__(self) -> str:
         return self.name
@@ -60,9 +61,9 @@ class NotificationType(ABC):
             user: The user to set the frequency for
             frequency: BaseFrequency class
         """
-        from .models import NotificationFrequency
+        from .models import NotificationFrequencyPreference
 
-        NotificationFrequency.objects.update_or_create(
+        NotificationFrequencyPreference.objects.update_or_create(
             user=user, notification_type=cls.key, defaults={"frequency": frequency.key}
         )
 
@@ -77,12 +78,12 @@ class NotificationType(ABC):
         Returns:
             BaseFrequency class (either user preference or default)
         """
-        from .models import NotificationFrequency
+        from .models import NotificationFrequencyPreference
 
         try:
-            user_frequency = NotificationFrequency.objects.get(user=user, notification_type=cls.key)
+            user_frequency = NotificationFrequencyPreference.objects.get(user=user, notification_type=cls.key)
             return registry.get_frequency(user_frequency.frequency)
-        except NotificationFrequency.DoesNotExist:
+        except NotificationFrequencyPreference.DoesNotExist:
             return cls.default_frequency
 
     @classmethod
@@ -93,9 +94,9 @@ class NotificationType(ABC):
         Args:
             user: The user to reset the frequency for
         """
-        from .models import NotificationFrequency
+        from .models import NotificationFrequencyPreference
 
-        NotificationFrequency.objects.filter(user=user, notification_type=cls.key).delete()
+        NotificationFrequencyPreference.objects.filter(user=user, notification_type=cls.key).delete()
 
     @classmethod
     def get_enabled_channels(cls, user: Any) -> list[Type[BaseChannel]]:
@@ -109,43 +110,45 @@ class NotificationType(ABC):
         Returns:
             List of enabled BaseChannel classes
         """
-        from .models import DisabledNotificationTypeChannel
+        from .models import NotificationTypeChannelPreference
 
-        # Get all disabled channel keys for this user/notification type in one query
-        disabled_channel_keys = set(
-            DisabledNotificationTypeChannel.objects.filter(user=user, notification_type=cls.key).values_list(
-                "channel", flat=True
-            )
-        )
+        # Get all user preferences for this notification type in one query
+        preferences = {
+            pref.channel: pref.enabled
+            for pref in NotificationTypeChannelPreference.objects.filter(user=user, notification_type=cls.key)
+        }
 
         # Get all forbidden channel keys
         forbidden_channel_keys = {channel_cls.key for channel_cls in cls.forbidden_channels}
 
-        # Filter out disabled and forbidden channels
         enabled_channels = []
         for channel_cls in registry.get_all_channels():
-            if channel_cls.key not in disabled_channel_keys and channel_cls.key not in forbidden_channel_keys:
+            # Skip forbidden channels always
+            if channel_cls.key in forbidden_channel_keys:
+                continue
+
+            # Required channels are always enabled
+            if channel_cls in cls.required_channels:
                 enabled_channels.append(channel_cls)
+                continue
+
+            # Check user preference first
+            if channel_cls.key in preferences:
+                if preferences[channel_cls.key]:
+                    enabled_channels.append(channel_cls)
+                continue
+
+            # No user preference - use defaults
+            if cls.default_channels is not None:
+                # Use explicitly configured default channels
+                if channel_cls in cls.default_channels:
+                    enabled_channels.append(channel_cls)
+            else:
+                # Use global channel defaults
+                if channel_cls.enabled_by_default:
+                    enabled_channels.append(channel_cls)
 
         return enabled_channels
-
-    @classmethod
-    def is_channel_enabled(cls, user: Any, channel: Type[BaseChannel]) -> bool:
-        """
-        Check if a channel is enabled for this notification type for a user.
-
-        Args:
-            user: User instance
-            channel: BaseChannel class
-
-        Returns:
-            True if channel is enabled, False if disabled
-        """
-        from .models import DisabledNotificationTypeChannel
-
-        return not DisabledNotificationTypeChannel.objects.filter(
-            user=user, notification_type=cls.key, channel=channel.key
-        ).exists()
 
     @classmethod
     def disable_channel(cls, user: Any, channel: Type[BaseChannel]) -> None:
@@ -156,9 +159,11 @@ class NotificationType(ABC):
             user: User instance
             channel: BaseChannel class
         """
-        from .models import DisabledNotificationTypeChannel
+        from .models import NotificationTypeChannelPreference
 
-        DisabledNotificationTypeChannel.objects.get_or_create(user=user, notification_type=cls.key, channel=channel.key)
+        NotificationTypeChannelPreference.objects.update_or_create(
+            user=user, notification_type=cls.key, channel=channel.key, defaults={"enabled": False}
+        )
 
     @classmethod
     def enable_channel(cls, user: Any, channel: Type[BaseChannel]) -> None:
@@ -169,11 +174,11 @@ class NotificationType(ABC):
             user: User instance
             channel: BaseChannel class
         """
-        from .models import DisabledNotificationTypeChannel
+        from .models import NotificationTypeChannelPreference
 
-        DisabledNotificationTypeChannel.objects.filter(
-            user=user, notification_type=cls.key, channel=channel.key
-        ).delete()
+        NotificationTypeChannelPreference.objects.update_or_create(
+            user=user, notification_type=cls.key, channel=channel.key, defaults={"enabled": True}
+        )
 
 
 def register(cls: Type[NotificationType]) -> Type[NotificationType]:

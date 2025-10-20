@@ -204,15 +204,17 @@ class NotificationChannel(models.Model):
         return f"{self.notification} - {self.channel} ({status})"
 
 
-class DisabledNotificationTypeChannel(models.Model):
+class NotificationTypeChannelPreference(models.Model):
     """
-    If a row exists here, that notification type/channel combination is DISABLED for the user.
-    By default (no row), all notifications are enabled on all channels.
+    Stores explicit user preferences for notification type/channel combinations.
+    If no row exists, the default behavior (from NotificationType.default_channels
+    or BaseChannel.enabled_by_default) is used.
     """
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="disabled_notification_type_channels")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notification_type_channel_preferences")
     notification_type = models.CharField(max_length=50)
     channel = models.CharField(max_length=20)
+    enabled = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ["user", "notification_type", "channel"]
@@ -232,11 +234,20 @@ class DisabledNotificationTypeChannel(models.Model):
                 )
 
         # Check if trying to disable a required channel
-        required_channel_keys = [cls.key for cls in notification_type_cls.required_channels]
-        if self.channel in required_channel_keys:
-            raise ValidationError(
-                f"Cannot disable {self.channel} channel for {notification_type_cls.name} - this channel is required"
-            )
+        if not self.enabled:
+            required_channel_keys = [cls.key for cls in notification_type_cls.required_channels]
+            if self.channel in required_channel_keys:
+                raise ValidationError(
+                    f"Cannot disable {self.channel} channel for {notification_type_cls.name} - this channel is required"
+                )
+
+        # Check if trying to enable a forbidden channel
+        if self.enabled:
+            forbidden_channel_keys = [cls.key for cls in notification_type_cls.forbidden_channels]
+            if self.channel in forbidden_channel_keys:
+                raise ValidationError(
+                    f"Cannot enable {self.channel} channel for {notification_type_cls.name} - this channel is forbidden"
+                )
 
         try:
             registry.get_channel(self.channel)
@@ -248,23 +259,24 @@ class DisabledNotificationTypeChannel(models.Model):
                 raise ValidationError(f"Unknown channel: {self.channel}. No channels are currently registered.")
 
     def __str__(self) -> str:
-        return f"{self.user} disabled {self.notification_type} on {self.channel}"
+        status = "enabled" if self.enabled else "disabled"
+        return f"{self.user} {status} {self.notification_type} on {self.channel}"
 
 
-class NotificationFrequency(models.Model):
+class NotificationFrequencyPreference(models.Model):
     """
     Delivery frequency preference per notification type.
     This applies to all channels that support the chosen frequency.
     Default is `NotificationType.default_frequency` if no row exists.
     """
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notification_frequencies")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notification_frequency_preferences")
     notification_type = models.CharField(max_length=50)
     frequency = models.CharField(max_length=20)
 
     class Meta:
         unique_together = ["user", "notification_type"]
-        verbose_name_plural = "Notification frequencies"
+        verbose_name_plural = "Notification frequency preferences"
 
     def clean(self):
         if self.notification_type:

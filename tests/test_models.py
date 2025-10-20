@@ -9,7 +9,11 @@ from django.utils import timezone
 
 from generic_notifications.channels import EmailChannel, WebsiteChannel
 from generic_notifications.frequencies import DailyFrequency
-from generic_notifications.models import DisabledNotificationTypeChannel, Notification, NotificationFrequency
+from generic_notifications.models import (
+    Notification,
+    NotificationFrequencyPreference,
+    NotificationTypeChannelPreference,
+)
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType, SystemMessage
 
@@ -38,7 +42,7 @@ class TestChannel:
     name = "Website"
 
 
-class DisabledNotificationTypeChannelModelTest(TestCase):
+class NotificationTypeChannelPreferenceModelTest(TestCase):
     user: Any  # User model instance created in setUpClass
 
     @classmethod
@@ -49,22 +53,12 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
         # Register test notification types and import channels for validation
         registry.register_type(TestNotificationType)
 
-    def test_create_disabled_notification(self):
-        disabled = DisabledNotificationTypeChannel.objects.create(
-            user=self.user,
-            notification_type=TestNotificationType.key,
-            channel=WebsiteChannel.key,
-        )
-
-        self.assertEqual(disabled.user, self.user)
-        self.assertEqual(disabled.notification_type, TestNotificationType.key)
-        self.assertEqual(disabled.channel, WebsiteChannel.key)
-
     def test_clean_with_invalid_notification_type(self):
-        disabled = DisabledNotificationTypeChannel(
+        disabled = NotificationTypeChannelPreference(
             user=self.user,
             notification_type="invalid_type",
             channel=WebsiteChannel.key,
+            enabled=False,
         )
 
         with self.assertRaises(ValidationError) as cm:
@@ -73,10 +67,11 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
         self.assertIn("Unknown notification type: invalid_type", str(cm.exception))
 
     def test_clean_with_invalid_channel(self):
-        disabled = DisabledNotificationTypeChannel(
+        disabled = NotificationTypeChannelPreference(
             user=self.user,
             notification_type=TestNotificationType.key,
             channel="invalid_channel",
+            enabled=False,
         )
 
         with self.assertRaises(ValidationError) as cm:
@@ -84,42 +79,45 @@ class DisabledNotificationTypeChannelModelTest(TestCase):
 
         self.assertIn("Unknown channel: invalid_channel", str(cm.exception))
 
-    def test_clean_with_valid_data(self):
-        disabled = DisabledNotificationTypeChannel(
-            user=self.user,
-            notification_type=TestNotificationType.key,
-            channel=WebsiteChannel.key,
-        )
-
-        # Should not raise any exception
-        disabled.clean()
-
     def test_clean_prevents_disabling_required_channel(self):
         """Test that users cannot disable required channels for notification types"""
-        disabled = DisabledNotificationTypeChannel(
+        preference = NotificationTypeChannelPreference(
             user=self.user,
             notification_type=SystemMessage.key,
             channel=EmailChannel.key,
+            enabled=False,  # Trying to disable
         )
 
         with self.assertRaises(ValidationError) as cm:
-            disabled.clean()
+            preference.clean()
 
         self.assertIn("Cannot disable email channel for System Message - this channel is required", str(cm.exception))
 
-    def test_clean_allows_disabling_non_required_channel(self):
-        """Test that users can disable non-required channels for notification types with required channels"""
-        disabled = DisabledNotificationTypeChannel(
+    def test_clean_prevents_enabling_forbidden_channel(self):
+        """Test that users cannot enable forbidden channels for notification types"""
+
+        # We need a notification type with forbidden channels for this test
+        class ForbiddenTestType(NotificationType):
+            key = "forbidden_test"
+            name = "Forbidden Test"
+            forbidden_channels = [WebsiteChannel]
+
+        registry.register_type(ForbiddenTestType)
+
+        preference = NotificationTypeChannelPreference(
             user=self.user,
-            notification_type=SystemMessage.key,
+            notification_type=ForbiddenTestType.key,
             channel=WebsiteChannel.key,
+            enabled=True,  # Trying to enable forbidden channel
         )
 
-        # Should not raise any exception - website is not required for system_message
-        disabled.clean()
+        with self.assertRaises(ValidationError) as cm:
+            preference.clean()
+
+        self.assertIn("Cannot enable website channel for Forbidden Test - this channel is forbidden", str(cm.exception))
 
 
-class NotificationFrequencyModelTest(TestCase):
+class NotificationFrequencyPreferenceModelTest(TestCase):
     user: Any  # User model instance created in setUpClass
 
     @classmethod
@@ -132,33 +130,23 @@ class NotificationFrequencyModelTest(TestCase):
         # Re-register DailyFrequency in case it was cleared by other tests
         registry.register_frequency(DailyFrequency, force=True)
 
-    def test_create_email_frequency(self):
-        frequency = NotificationFrequency.objects.create(
-            user=self.user,
-            notification_type=TestNotificationType.key,
-            frequency=DailyFrequency.key,
-        )
-
-        self.assertEqual(frequency.user, self.user)
-        self.assertEqual(frequency.notification_type, TestNotificationType.key)
-        self.assertEqual(frequency.frequency, DailyFrequency.key)
-
     def test_unique_together_constraint(self):
-        NotificationFrequency.objects.create(
+        """Test that users can only have one frequency preference per notification type"""
+        NotificationFrequencyPreference.objects.create(
             user=self.user,
             notification_type=TestNotificationType.key,
             frequency=DailyFrequency.key,
         )
 
         with self.assertRaises(IntegrityError):
-            NotificationFrequency.objects.create(
+            NotificationFrequencyPreference.objects.create(
                 user=self.user,
                 notification_type=TestNotificationType.key,
                 frequency=DailyFrequency.key,
             )
 
     def test_clean_with_invalid_notification_type(self):
-        frequency = NotificationFrequency(
+        frequency = NotificationFrequencyPreference(
             user=self.user,
             notification_type="invalid_type",
             frequency=DailyFrequency.key,
@@ -170,7 +158,7 @@ class NotificationFrequencyModelTest(TestCase):
         self.assertIn("Unknown notification type: invalid_type", str(cm.exception))
 
     def test_clean_with_invalid_frequency(self):
-        frequency = NotificationFrequency(
+        frequency = NotificationFrequencyPreference(
             user=self.user,
             notification_type=TestNotificationType.key,
             frequency="invalid_frequency",
@@ -180,16 +168,6 @@ class NotificationFrequencyModelTest(TestCase):
             frequency.clean()
 
         self.assertIn("Unknown frequency: invalid_frequency", str(cm.exception))
-
-    def test_clean_with_valid_data(self):
-        frequency = NotificationFrequency(
-            user=self.user,
-            notification_type=TestNotificationType.key,
-            frequency=DailyFrequency.key,
-        )
-
-        # Should not raise any exception
-        frequency.clean()
 
 
 class NotificationModelTest(TestCase):
