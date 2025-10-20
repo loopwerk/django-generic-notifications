@@ -1,6 +1,6 @@
 ## User Preferences
 
-By default, users receive notifications based on the channel defaults configured for each notification type and channel. Users can then customize their preferences by explicitly enabling or disabling specific channels for each notification type.
+By default, users receive notifications based on the channel defaults configured for each notification type and channel (see [customizing.md](https://github.com/loopwerk/django-generic-notifications/tree/main/docs/customizing.md)). Users can then customize their preferences by explicitly enabling or disabling specific channels for each notification type.
 
 The system supports both:
 
@@ -47,22 +47,6 @@ CommentNotification.enable_channel(user=user, channel=EmailChannel)
 # Check which channels are enabled for a user
 enabled_channels = CommentNotification.get_enabled_channels(user)
 
-# Set frequency preference directly in the database
-NotificationFrequencyPreference.objects.update_or_create(
-    user=user,
-    notification_type=CommentNotification.key,
-    defaults={'frequency': RealtimeFrequency.key}
-)
+# Change to realtime frequency for a notification type
+CommentNotification.set_frequency(user=user, frequency=RealtimeFrequency)
 ```
-
-### How defaults work
-
-The system determines which channels are enabled using this priority order:
-
-1. **Forbidden channels** - Always disabled (defined in `NotificationType.forbidden_channels`)
-2. **Required channels** - Always enabled (defined in `NotificationType.required_channels`)
-3. **User preferences** - Explicit user choices stored in `NotificationTypeChannelPreference`
-4. **NotificationType defaults** - Per-type defaults (defined in `NotificationType.default_channels`)
-5. **Channel defaults** - Global defaults (defined in `BaseChannel.enabled_by_default`)
-
-This allows for flexible configuration where notification types can have different default behaviors while still allowing user customization.
