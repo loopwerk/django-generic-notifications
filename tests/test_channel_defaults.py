@@ -52,21 +52,34 @@ class TestChannelDefaults(TestCase):
     def test_required_and_forbidden_channel_interactions(self):
         """Test how required/forbidden channels interact with defaults"""
 
+        # First create a custom channel that's disabled by default
+        @register_channel
+        class CustomRequiredChannel(BaseChannel):
+            key = "custom_required"
+            name = "Custom Required"
+            enabled_by_default = False
+
+            def send_now(self, notification):
+                pass
+
         class ComplexType(NotificationType):
             key = "complex_type"
             name = "Complex Type"
-            default_channels = [WebsiteChannel]
-            required_channels = [EmailChannel]  # Always included
-            forbidden_channels = [WebsiteChannel]  # Never included
+            required_channels = [CustomRequiredChannel]  # Force inclusion of normally-disabled channel
+            forbidden_channels = [WebsiteChannel]  # Force exclusion of normally-enabled channel
 
         registry.register_type(ComplexType)
 
         enabled_channels = ComplexType.get_enabled_channels(self.user)
         enabled_keys = [ch.key for ch in enabled_channels]
 
-        # Required should be included, forbidden should be excluded
-        self.assertIn(EmailChannel.key, enabled_keys)
+        self.assertEqual(len(enabled_keys), 2)
+        # Required channel should be included even though disabled by default
+        self.assertIn(CustomRequiredChannel.key, enabled_keys)
+        # Forbidden channel should be excluded even though enabled by default
         self.assertNotIn(WebsiteChannel.key, enabled_keys)
+        # EmailChannel should still be included (default behavior)
+        self.assertIn(EmailChannel.key, enabled_keys)
 
     def test_user_overrides_and_empty_defaults(self):
         """Test user can disable defaults and empty default_channels works"""
@@ -116,7 +129,6 @@ class TestChannelDefaults(TestCase):
         class GlobalDefaultType(NotificationType):
             key = "uses_global"
             name = "Uses Global"
-            default_channels = None
 
         class ExplicitCustomType(NotificationType):
             key = "uses_custom"
