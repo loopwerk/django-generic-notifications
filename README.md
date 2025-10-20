@@ -14,6 +14,12 @@ A flexible, multi-channel notification system for Django applications with built
 - **Developer friendly**: Simple API for sending notifications with automatic channel routing
 - **Full type hints**: Complete type annotations for better IDE support and type checking
 
+## Requirements
+
+- Python >= 3.10
+- Django >= 4.2.0
+- `django.contrib.contenttypes` must be in `INSTALLED_APPS`
+
 ## Installation
 
 All instruction in this document use [uv](https://github.com/astral-sh/uv), but of course pip or Poetry will also work just fine.
@@ -27,6 +33,7 @@ Add to your `INSTALLED_APPS`:
 ```python
 INSTALLED_APPS = [
     ...
+    "django.contrib.contenttypes",  # Required dependency
     "generic_notifications",
     ...
 ]
