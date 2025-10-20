@@ -145,6 +145,30 @@ class NotificationFrequencyPreferenceModelTest(TestCase):
                 frequency=DailyFrequency.key,
             )
 
+    def test_clean_with_invalid_notification_type(self):
+        frequency = NotificationFrequencyPreference(
+            user=self.user,
+            notification_type="invalid_type",
+            frequency=DailyFrequency.key,
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            frequency.clean()
+
+        self.assertIn("Unknown notification type: invalid_type", str(cm.exception))
+
+    def test_clean_with_invalid_frequency(self):
+        frequency = NotificationFrequencyPreference(
+            user=self.user,
+            notification_type=TestNotificationType.key,
+            frequency="invalid_frequency",
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            frequency.clean()
+
+        self.assertIn("Unknown frequency: invalid_frequency", str(cm.exception))
+
 
 class NotificationModelTest(TestCase):
     user: Any  # User model instance created in setUpClass
