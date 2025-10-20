@@ -1,6 +1,6 @@
 [project]
 name = "django-generic-notifications"
-version = "2.1.0"
+version = "2.2.0"
 description = "A flexible, multi-channel notification system for Django applications with built-in support for email digests, user preferences, and extensible delivery channels."
 authors = [
     {name = "Kevin Renskers", email = "kevin@loopwerk.io"},
