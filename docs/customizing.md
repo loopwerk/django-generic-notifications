@@ -67,6 +67,14 @@ Customize email templates by creating these files in your templates directory:
 - `notifications/email/realtime/{notification_type}.html`
 - `notifications/email/realtime/{notification_type}.txt`
 
+If notification-type specific templates are not found, the system will fall back to:
+
+- `notifications/email/realtime/subject.txt`
+- `notifications/email/realtime/body.html`
+- `notifications/email/realtime/body.txt`
+
+This allows you to create generic templates that work for all notification types while still having the flexibility to create specific templates for certain types.
+
 ### Digest emails
 
 - `notifications/email/digest/subject.txt`

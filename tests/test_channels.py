@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.template import TemplateDoesNotExist
 from django.test import TestCase, override_settings
 
 from generic_notifications.channels import BaseChannel, EmailChannel
@@ -207,19 +208,29 @@ class EmailChannelTest(TestCase):
         self.assertEqual(email.body, "")
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
-    @patch("generic_notifications.channels.render_to_string")
-    def test_send_now_with_template(self, mock_render):
-        # Set up mock to return different values for different templates
-        def mock_render_side_effect(template_name, context):
-            if template_name.endswith("_subject.txt"):
-                return "Test Subject"
-            elif template_name.endswith(".html"):
-                return "<html>Test HTML</html>"
-            elif template_name.endswith(".txt"):
-                return "Test plain text"
-            return ""
+    @patch("generic_notifications.channels.select_template")
+    def test_send_now_with_template(self, mock_select):
+        # Create mock template objects that return the expected content
+        class MockTemplate:
+            def __init__(self, content):
+                self.content = content
 
-        mock_render.side_effect = mock_render_side_effect
+            def render(self, context):
+                return self.content
+
+        # Set up mock to return different templates based on the template list
+        def mock_select_side_effect(template_list):
+            # Check the first template in the list to determine what to return
+            first_template = template_list[0]
+            if first_template.endswith("_subject.txt"):
+                return MockTemplate("Test Subject")
+            elif first_template.endswith(".html"):
+                return MockTemplate("<html>Test HTML</html>")
+            elif first_template.endswith(".txt"):
+                return MockTemplate("Test plain text")
+            return MockTemplate("")
+
+        mock_select.side_effect = mock_select_side_effect
 
         notification = create_notification_with_channels(
             user=self.user,
@@ -231,25 +242,7 @@ class EmailChannelTest(TestCase):
         channel = EmailChannel()
         channel.send_now(notification)
 
-        # Check templates were rendered (subject, HTML, then text)
-        self.assertEqual(mock_render.call_count, 3)
-
-        # Check subject template call (first)
-        subject_call = mock_render.call_args_list[0]
-        self.assertEqual(subject_call[0][0], "notifications/email/realtime/test_type_subject.txt")
-        self.assertEqual(subject_call[0][1]["notification"], notification)
-
-        # Check HTML template call (second)
-        html_call = mock_render.call_args_list[1]
-        self.assertEqual(html_call[0][0], "notifications/email/realtime/test_type.html")
-        self.assertEqual(html_call[0][1]["notification"], notification)
-
-        # Check text template call (third)
-        text_call = mock_render.call_args_list[2]
-        self.assertEqual(text_call[0][0], "notifications/email/realtime/test_type.txt")
-        self.assertEqual(text_call[0][1]["notification"], notification)
-
-        # Check email was sent with correct subject
+        # Check email was sent with correct subject and text
         self.assertEqual(len(mail.outbox), 1)
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Test Subject")
@@ -257,6 +250,50 @@ class EmailChannelTest(TestCase):
         # HTML version should be in alternatives
         self.assertEqual(len(email.alternatives), 1)  # type: ignore
         self.assertEqual(email.alternatives[0][0], "<html>Test HTML</html>")  # type: ignore
+
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
+    @patch("generic_notifications.channels.select_template")
+    def test_send_now_with_fallback_templates(self, mock_select):
+        """Test that fallback templates are used when notification-specific templates don't exist."""
+
+        # Create mock template objects
+        class MockTemplate:
+            def __init__(self, content):
+                self.content = content
+
+            def render(self, context):
+                return self.content
+
+        # Set up mock to simulate using fallback templates (second in the list)
+        def mock_select_side_effect(template_list):
+            if "subject.txt" in template_list[1]:
+                return MockTemplate("Fallback Subject")
+            elif "body.html" in template_list[1]:
+                return MockTemplate("<html>Fallback HTML Body</html>")
+            elif "body.txt" in template_list[1]:
+                return MockTemplate("Fallback Text Body")
+            raise TemplateDoesNotExist("No templates found")
+
+        mock_select.side_effect = mock_select_side_effect
+
+        notification = create_notification_with_channels(
+            user=self.user,
+            notification_type="new_type",
+            subject="Original Subject",
+            text="Original message",
+        )
+
+        channel = EmailChannel()
+        channel.send_now(notification)
+
+        # Check email was sent with fallback content
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertEqual(email.subject, "Fallback Subject")
+        self.assertEqual(email.body, "Fallback Text Body")
+        # HTML version should be in alternatives
+        self.assertEqual(len(email.alternatives), 1)
+        self.assertEqual(email.alternatives[0][0], "<html>Fallback HTML Body</html>")
 
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_now_template_error_fallback(self):

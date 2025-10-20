@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.mail import send_mail as django_send_mail
 from django.db.models import QuerySet
 from django.template.defaultfilters import pluralize
-from django.template.loader import render_to_string
+from django.template.loader import render_to_string, select_template
 
 from .frequencies import BaseFrequency
 from .registry import registry
@@ -144,27 +144,39 @@ class EmailChannel(BaseChannel):
                 "target": notification.target,
             }
 
-            subject_template = f"notifications/email/realtime/{notification.notification_type}_subject.txt"
-            html_template = f"notifications/email/realtime/{notification.notification_type}.html"
-            text_template = f"notifications/email/realtime/{notification.notification_type}.txt"
+            subject_templates = [
+                f"notifications/email/realtime/{notification.notification_type}_subject.txt",
+                "notifications/email/realtime/subject.txt",
+            ]
+            html_templates = [
+                f"notifications/email/realtime/{notification.notification_type}.html",
+                "notifications/email/realtime/body.html",
+            ]
+            text_templates = [
+                f"notifications/email/realtime/{notification.notification_type}.txt",
+                "notifications/email/realtime/body.txt",
+            ]
 
             # Load subject
             try:
-                subject = render_to_string(subject_template, context).strip()
+                subject_template = select_template(subject_templates)
+                subject = subject_template.render(context).strip()
             except Exception:
                 # Fallback to notification's subject
                 subject = notification.get_subject()
 
             # Load HTML message
             try:
-                html_message = render_to_string(html_template, context)
+                html_template = select_template(html_templates)
+                html_message = html_template.render(context)
             except Exception:
                 html_message = None
 
             # Load plain text message
             text_message: str
             try:
-                text_message = render_to_string(text_template, context)
+                text_template = select_template(text_templates)
+                text_message = text_template.render(context)
             except Exception:
                 # Fallback to notification's text with URL if available
                 text_message = notification.get_text()
