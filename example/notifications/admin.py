@@ -1,5 +1,9 @@
 from django.contrib import admin
-from generic_notifications.models import DisabledNotificationTypeChannel, Notification, NotificationFrequency
+from generic_notifications.models import (
+    Notification,
+    NotificationFrequencyPreference,
+    NotificationTypeChannelPreference,
+)
 
 
 @admin.register(Notification)
@@ -15,11 +19,11 @@ class NotificationAdmin(admin.ModelAdmin):
         return ", ".join(channels) if channels else "-"
 
 
-@admin.register(DisabledNotificationTypeChannel)
-class DisabledNotificationTypeChannelAdmin(admin.ModelAdmin):
-    list_display = ["user", "notification_type", "channel"]
+@admin.register(NotificationTypeChannelPreference)
+class NotificationTypeChannelPreferenceAdmin(admin.ModelAdmin):
+    list_display = ["user", "notification_type", "channel", "enabled"]
 
 
-@admin.register(NotificationFrequency)
-class NotificationFrequencyAdmin(admin.ModelAdmin):
+@admin.register(NotificationFrequencyPreference)
+class NotificationFrequencyPreferenceAdmin(admin.ModelAdmin):
     list_display = ["user", "notification_type", "frequency"]

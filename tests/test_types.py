@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from generic_notifications.channels import EmailChannel, WebsiteChannel
 from generic_notifications.frequencies import DailyFrequency, RealtimeFrequency
-from generic_notifications.models import DisabledNotificationTypeChannel, NotificationFrequency
+from generic_notifications.models import NotificationFrequencyPreference, NotificationTypeChannelPreference
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
 
@@ -39,25 +39,27 @@ class NotificationTypeTest(TestCase):
     def test_disable_channel(self):
         """Test the disable_channel class method"""
         # Verify channel is enabled initially
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
+        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
+        self.assertIn(WebsiteChannel, enabled_channels)
 
         # Disable the channel
         TestNotificationType.disable_channel(self.user, WebsiteChannel)
 
-        # Verify it was created
+        # Verify preference was created
         self.assertTrue(
-            DisabledNotificationTypeChannel.objects.filter(
-                user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
+            NotificationTypeChannelPreference.objects.filter(
+                user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key, enabled=False
             ).exists()
         )
 
         # Verify channel is now disabled
-        self.assertFalse(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
+        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
+        self.assertNotIn(WebsiteChannel, enabled_channels)
 
-        # Disabling again should not create duplicate (get_or_create behavior)
+        # Disabling again should update existing preference
         TestNotificationType.disable_channel(self.user, WebsiteChannel)
         self.assertEqual(
-            DisabledNotificationTypeChannel.objects.filter(
+            NotificationTypeChannelPreference.objects.filter(
                 user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
             ).count(),
             1,
@@ -66,85 +68,35 @@ class NotificationTypeTest(TestCase):
     def test_enable_channel(self):
         """Test the enable_channel class method"""
         # First disable the channel
-        DisabledNotificationTypeChannel.objects.create(
-            user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
-        )
-        self.assertFalse(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
+        TestNotificationType.disable_channel(self.user, WebsiteChannel)
+        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
+        self.assertNotIn(WebsiteChannel, enabled_channels)
 
         # Enable the channel
         TestNotificationType.enable_channel(self.user, WebsiteChannel)
 
-        # Verify the disabled entry was removed
-        self.assertFalse(
-            DisabledNotificationTypeChannel.objects.filter(
-                user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
+        # Verify preference was updated
+        self.assertTrue(
+            NotificationTypeChannelPreference.objects.filter(
+                user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key, enabled=True
             ).exists()
         )
 
         # Verify channel is now enabled
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
+        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
+        self.assertIn(WebsiteChannel, enabled_channels)
 
         # Enabling an already enabled channel should work without error
         TestNotificationType.enable_channel(self.user, WebsiteChannel)
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-
-    def test_is_channel_enabled(self):
-        """Test the is_channel_enabled class method"""
-        # By default, all channels should be enabled
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, EmailChannel))
-
-        # Disable website channel
-        DisabledNotificationTypeChannel.objects.create(
-            user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
-        )
-
-        # Website should be disabled, email should still be enabled
-        self.assertFalse(TestNotificationType.is_channel_enabled(self.user, WebsiteChannel))
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, EmailChannel))
-
-        # Different user should not be affected
-        other_user = User.objects.create_user(username="other", email="other@example.com", password="pass")
-        self.assertTrue(TestNotificationType.is_channel_enabled(other_user, WebsiteChannel))
-
-    def test_get_enabled_channels(self):
-        """Test the get_enabled_channels optimization method"""
-        # By default, all channels should be enabled
         enabled_channels = TestNotificationType.get_enabled_channels(self.user)
-        enabled_channel_keys = [ch.key for ch in enabled_channels]
-
-        self.assertIn(WebsiteChannel.key, enabled_channel_keys)
-        self.assertIn(EmailChannel.key, enabled_channel_keys)
-        self.assertEqual(len(enabled_channels), 2)
-
-        # Disable website channel
-        DisabledNotificationTypeChannel.objects.create(
-            user=self.user, notification_type=TestNotificationType.key, channel=WebsiteChannel.key
-        )
-
-        # Should now only return email channel
-        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
-        enabled_channel_keys = [ch.key for ch in enabled_channels]
-
-        self.assertNotIn(WebsiteChannel.key, enabled_channel_keys)
-        self.assertIn(EmailChannel.key, enabled_channel_keys)
-        self.assertEqual(len(enabled_channels), 1)
-
-        # Different user should not be affected
-        other_user = User.objects.create_user(username="other2", email="other2@example.com", password="pass")
-        other_enabled_channels = TestNotificationType.get_enabled_channels(other_user)
-        other_enabled_channel_keys = [ch.key for ch in other_enabled_channels]
-
-        self.assertIn(WebsiteChannel.key, other_enabled_channel_keys)
-        self.assertIn(EmailChannel.key, other_enabled_channel_keys)
-        self.assertEqual(len(other_enabled_channels), 2)
+        self.assertIn(WebsiteChannel, enabled_channels)
 
     def test_set_frequency(self):
         # Set frequency for the first time
         TestNotificationType.set_frequency(self.user, DailyFrequency)
 
         # Verify it was created
-        freq = NotificationFrequency.objects.get(user=self.user, notification_type=TestNotificationType.key)
+        freq = NotificationFrequencyPreference.objects.get(user=self.user, notification_type=TestNotificationType.key)
         self.assertEqual(freq.frequency, DailyFrequency.key)
 
         # Update to a different frequency
@@ -157,12 +109,15 @@ class NotificationTypeTest(TestCase):
 
         # Verify there's still only one record
         self.assertEqual(
-            NotificationFrequency.objects.filter(user=self.user, notification_type=TestNotificationType.key).count(), 1
+            NotificationFrequencyPreference.objects.filter(
+                user=self.user, notification_type=TestNotificationType.key
+            ).count(),
+            1,
         )
 
     def test_get_frequency_with_user_preference(self):
         # Set user preference
-        NotificationFrequency.objects.create(
+        NotificationFrequencyPreference.objects.create(
             user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
         )
 
@@ -195,11 +150,13 @@ class NotificationTypeTest(TestCase):
 
     def test_reset_to_default(self):
         # First set a custom preference
-        NotificationFrequency.objects.create(
+        NotificationFrequencyPreference.objects.create(
             user=self.user, notification_type=TestNotificationType.key, frequency=DailyFrequency.key
         )
         self.assertTrue(
-            NotificationFrequency.objects.filter(user=self.user, notification_type=TestNotificationType.key).exists()
+            NotificationFrequencyPreference.objects.filter(
+                user=self.user, notification_type=TestNotificationType.key
+            ).exists()
         )
 
         # Reset to default
@@ -207,7 +164,9 @@ class NotificationTypeTest(TestCase):
 
         # Verify the custom preference was removed
         self.assertFalse(
-            NotificationFrequency.objects.filter(user=self.user, notification_type=TestNotificationType.key).exists()
+            NotificationFrequencyPreference.objects.filter(
+                user=self.user, notification_type=TestNotificationType.key
+            ).exists()
         )
 
         # Getting frequency should now return the default
@@ -256,8 +215,8 @@ class TestForbiddenChannels(TestCase):
 
     def test_forbidden_channels_filtered_when_not_disabled(self):
         """Test that forbidden channels are filtered out regardless of disabled state"""
-        # Ensure no disabled entry exists for the forbidden channel
-        DisabledNotificationTypeChannel.objects.filter(
+        # Ensure no preference exists for the forbidden channel
+        NotificationTypeChannelPreference.objects.filter(
             user=self.user, notification_type=ForbiddenChannelsNotificationType.key, channel=WebsiteChannel.key
         ).delete()
 

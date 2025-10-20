@@ -6,9 +6,13 @@ from django.core import mail
 from django.template import TemplateDoesNotExist
 from django.test import TestCase, override_settings
 
-from generic_notifications.channels import BaseChannel, EmailChannel
+from generic_notifications.channels import BaseChannel, EmailChannel, WebsiteChannel
 from generic_notifications.frequencies import DailyFrequency, RealtimeFrequency
-from generic_notifications.models import DisabledNotificationTypeChannel, Notification, NotificationFrequency
+from generic_notifications.models import (
+    Notification,
+    NotificationFrequencyPreference,
+    NotificationTypeChannelPreference,
+)
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
 
@@ -45,45 +49,22 @@ class NotificationChannelTest(TestCase):
         self.assertEqual(channel.key, "test")
         self.assertEqual(channel.name, "Test")
 
-    def test_is_enabled_default_true(self):
-        class TestChannel(BaseChannel):
-            key = "test"
-            name = "Test"
-
-            def process(self, notification):
-                pass
-
-        # By default, all notifications are enabled
-        self.assertTrue(TestNotificationType.is_channel_enabled(self.user, TestChannel))
-
-    def test_is_enabled_with_disabled_notification(self):
-        class TestChannel(BaseChannel):
-            key = "test"
-            name = "Test"
-
-            def process(self, notification):
-                pass
-
-        class DisabledNotificationType(NotificationType):
-            key = "disabled_type"
-            name = "Disabled Type"
-
-        class OtherNotificationType(NotificationType):
-            key = "other_type"
-            name = "Other Type"
-
-        # Disable notification channel for this user
-        DisabledNotificationTypeChannel.objects.create(
+    def test_channel_preferences_work_correctly(self):
+        """Test that channel preferences correctly enable/disable channels per notification type."""
+        # Disable website channel for test_type notifications
+        NotificationTypeChannelPreference.objects.create(
             user=self.user,
-            notification_type="disabled_type",
-            channel="test",
+            notification_type="test_type",
+            channel="website",
+            enabled=False,
         )
 
-        # Should be disabled for this type
-        self.assertFalse(DisabledNotificationType.is_channel_enabled(self.user, TestChannel))
+        # Should be disabled for test_type
+        enabled_channels = TestNotificationType.get_enabled_channels(self.user)
+        self.assertNotIn(WebsiteChannel, enabled_channels)
 
-        # But enabled for other types
-        self.assertTrue(OtherNotificationType.is_channel_enabled(self.user, TestChannel))
+        # But should still include email channel
+        self.assertIn(EmailChannel, enabled_channels)
 
     def test_digest_only_channel_never_sends_immediately(self):
         """Test that channels with supports_realtime=False never send immediately."""
@@ -150,7 +131,7 @@ class EmailChannelTest(TestCase):
 
     def test_process_digest_frequency(self):
         # Set user preference to daily (non-realtime)
-        NotificationFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(user=self.user, notification_type="test_type", frequency="daily")
 
         notification = create_notification_with_channels(
             user=self.user,
@@ -338,7 +319,7 @@ class EmailChannelTest(TestCase):
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_basic(self):
         # Set user to daily frequency to prevent realtime sending
-        NotificationFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(user=self.user, notification_type="test_type", frequency="daily")
 
         # Create test notifications without email_sent_at (unsent)
         for i in range(3):
@@ -372,7 +353,7 @@ class EmailChannelTest(TestCase):
     @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
     def test_send_digest_emails_with_frequency(self):
         # Set user to daily frequency to prevent realtime sending
-        NotificationFrequency.objects.create(user=self.user, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(user=self.user, notification_type="test_type", frequency="daily")
 
         create_notification_with_channels(
             user=self.user,

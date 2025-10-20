@@ -24,6 +24,7 @@ class BaseChannel(ABC):
     name: str
     supports_realtime: bool = True
     supports_digest: bool = False
+    enabled_by_default: bool = True
 
     @classmethod
     def should_send(cls, notification: "Notification") -> bool:

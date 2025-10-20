@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from generic_notifications.channels import EmailChannel
 from generic_notifications.frequencies import BaseFrequency, DailyFrequency, RealtimeFrequency
-from generic_notifications.models import Notification, NotificationFrequency
+from generic_notifications.models import Notification, NotificationFrequencyPreference
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
 
@@ -79,7 +79,9 @@ class SendDigestEmailsCommandTest(TestCase):
 
     def test_send_digest_emails_basic_flow(self):
         # Set up user with daily frequency preference
-        NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="test_type", frequency="daily"
+        )
 
         # Create a notification
         notification = create_notification_with_channels(
@@ -109,7 +111,9 @@ class SendDigestEmailsCommandTest(TestCase):
         self.assertTrue(notification.is_sent_on_channel(EmailChannel))
 
     def test_dry_run_does_not_send_emails(self):
-        NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="test_type", frequency="daily"
+        )
 
         notification = create_notification_with_channels(
             user=self.user1,
@@ -131,7 +135,9 @@ class SendDigestEmailsCommandTest(TestCase):
         self.assertFalse(notification.is_sent_on_channel(EmailChannel))
 
     def test_only_includes_unread_notifications(self):
-        NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="test_type", frequency="daily"
+        )
 
         # Create read and unread notifications
         read_notification = create_notification_with_channels(
@@ -164,7 +170,9 @@ class SendDigestEmailsCommandTest(TestCase):
         self.assertTrue(unread_notification.is_sent_on_channel(EmailChannel))  # Now sent
 
     def test_only_includes_unsent_notifications(self):
-        NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="test_type", frequency="daily"
+        )
 
         # Create sent and unsent notifications
         sent_notification = create_notification_with_channels(
@@ -195,7 +203,9 @@ class SendDigestEmailsCommandTest(TestCase):
         self.assertTrue(unsent_notification.is_sent_on_channel(EmailChannel))
 
     def test_sends_all_unsent_notifications(self):
-        NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="test_type", frequency="daily"
+        )
 
         # Create notification older than time window (>1 day ago)
         old_notification = create_notification_with_channels(
@@ -235,8 +245,12 @@ class SendDigestEmailsCommandTest(TestCase):
 
     def test_specific_frequency_filter(self):
         # Set up users with different frequency preferences
-        NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="daily")
-        NotificationFrequency.objects.create(user=self.user2, notification_type="test_type", frequency="weekly")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="test_type", frequency="daily"
+        )
+        NotificationFrequencyPreference.objects.create(
+            user=self.user2, notification_type="test_type", frequency="weekly"
+        )
 
         # Create notifications for both
         create_notification_with_channels(
@@ -272,8 +286,12 @@ class SendDigestEmailsCommandTest(TestCase):
 
     def test_multiple_notification_types_for_user(self):
         # Set up user with multiple notification types for daily frequency
-        NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="daily")
-        NotificationFrequency.objects.create(user=self.user1, notification_type="other_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="test_type", frequency="daily"
+        )
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="other_type", frequency="daily"
+        )
 
         # Create notifications of both types
         notification1 = create_notification_with_channels(
@@ -308,7 +326,9 @@ class SendDigestEmailsCommandTest(TestCase):
         self.assertTrue(notification2.is_sent_on_channel(EmailChannel))
 
     def test_no_notifications_to_send(self):
-        NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="test_type", frequency="daily"
+        )
 
         # No notifications created
 
@@ -334,7 +354,7 @@ class SendDigestEmailsCommandTest(TestCase):
 
     def test_users_with_default_frequencies_get_digest(self):
         """Test that users without explicit preferences get digest emails based on default frequencies."""
-        # Don't create any NotificationFrequency preferences - user will use defaults
+        # Don't create any NotificationFrequencyPreference preferences - user will use defaults
 
         # Create a test_type notification (defaults to daily)
         test_notification = create_notification_with_channels(
@@ -370,7 +390,9 @@ class SendDigestEmailsCommandTest(TestCase):
     def test_mixed_explicit_and_default_preferences(self):
         """Test that users with some explicit preferences and some defaults work correctly."""
         # User explicitly sets test_type to weekly
-        NotificationFrequency.objects.create(user=self.user1, notification_type="test_type", frequency="weekly")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user1, notification_type="test_type", frequency="weekly"
+        )
         # other_type will use its default (realtime)
 
         # Create notifications
@@ -403,8 +425,12 @@ class SendDigestEmailsCommandTest(TestCase):
         # user2: Explicit preference (test_type=weekly, other_type uses default=realtime)
         # user3: Mixed (test_type=daily explicit, other_type uses default=realtime)
 
-        NotificationFrequency.objects.create(user=self.user2, notification_type="test_type", frequency="weekly")
-        NotificationFrequency.objects.create(user=self.user3, notification_type="test_type", frequency="daily")
+        NotificationFrequencyPreference.objects.create(
+            user=self.user2, notification_type="test_type", frequency="weekly"
+        )
+        NotificationFrequencyPreference.objects.create(
+            user=self.user3, notification_type="test_type", frequency="daily"
+        )
 
         # Create test notifications for all users
         for i, user in enumerate([self.user1, self.user2, self.user3], 1):
