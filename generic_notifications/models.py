@@ -49,7 +49,7 @@ class Notification(models.Model):
 
     # Generic relation to link to any object (article, comment, etc)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
-    object_id = models.PositiveIntegerField(null=True, blank=True)
+    object_id = models.CharField(max_length=36, null=True, blank=True)
     target = GenericForeignKey("content_type", "object_id")
 
     # Flexible metadata for any extra data
@@ -61,6 +61,7 @@ class Notification(models.Model):
         indexes = [
             models.Index(fields=["recipient", "read"], name="notification_unread_idx"),
             models.Index(fields=["recipient", "added"], name="notification_recipient_idx"),
+            models.Index(fields=["content_type", "object_id"], name="notification_target_idx"),
         ]
         ordering = ["-added"]
 

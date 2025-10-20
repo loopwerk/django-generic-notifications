@@ -25,6 +25,9 @@ uv run .
 # Linting and formatting
 uv run ruff check .
 uv run ruff format .
+
+# Creating migrations
+uv run django-admin makemigrations generic_notifications --settings=tests.settings
 ```
 
 ## Architecture Overview
