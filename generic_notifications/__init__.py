@@ -80,23 +80,22 @@ def send_notification(
         if notification_type.should_save(notification):
             notification.save()
 
-            # Create NotificationChannel entries for each enabled channel
+            # Check should_send and process for each enabled channel
             for channel_cls in enabled_channel_classes:
-                NotificationChannel.objects.create(
-                    notification=notification,
-                    channel=channel_cls.key,
-                )
-
-            # Process through enabled channels only
-            enabled_channel_instances = [channel_cls() for channel_cls in enabled_channel_classes]
-            for channel_instance in enabled_channel_instances:
-                try:
-                    channel_instance.process(notification)
-                except Exception as e:
-                    # Log error but don't crash - other channels should still work
-                    logger = logging.getLogger(__name__)
-                    logger.error(
-                        f"Channel {channel_instance.key} failed to process notification {notification.id}: {e}"
+                if channel_cls.should_send(notification):
+                    # Create NotificationChannel entry only for channels that can send
+                    NotificationChannel.objects.create(
+                        notification=notification,
+                        channel=channel_cls.key,
                     )
+
+                    # Process the notification through this channel
+                    try:
+                        channel_instance = channel_cls()
+                        channel_instance.process(notification)
+                    except Exception as e:
+                        # Log error but don't crash - other channels should still work
+                        logger = logging.getLogger(__name__)
+                        logger.error(f"Channel {channel_cls.key} failed to process notification {notification.id}: {e}")
 
             return notification

@@ -25,6 +25,20 @@ class BaseChannel(ABC):
     supports_realtime: bool = True
     supports_digest: bool = False
 
+    @classmethod
+    def should_send(cls, notification: "Notification") -> bool:
+        """
+        Check if this channel can send the given notification.
+        Override in subclasses to add channel-specific validation.
+
+        Args:
+            notification: Notification instance to check
+
+        Returns:
+            bool: True if the channel can send this notification, False otherwise
+        """
+        return True
+
     def process(self, notification: "Notification") -> None:
         """
         Process a notification through this channel based on channel capabilities
@@ -64,9 +78,7 @@ class BaseChannel(ABC):
         """
         raise NotImplementedError(f"{self.__class__.__name__} does not support realtime sending")
 
-    def send_digest(
-        self, notifications: "QuerySet[Notification]", frequency: type[BaseFrequency] | None = None
-    ) -> None:
+    def send_digest(self, notifications: "QuerySet[Notification]", frequency: type[BaseFrequency]) -> None:
         """
         Send a digest with specific notifications.
         Override in subclasses that support digest delivery.
@@ -128,6 +140,19 @@ class EmailChannel(BaseChannel):
     name = "Email"
     supports_realtime = True
     supports_digest = True
+
+    @classmethod
+    def should_send(cls, notification: "Notification") -> bool:
+        """
+        Check if the recipient has an email address.
+
+        Args:
+            notification: Notification instance to check
+
+        Returns:
+            bool: True if the recipient has an email address, False otherwise
+        """
+        return bool(getattr(notification.recipient, "email", None))
 
     def send_now(self, notification: "Notification") -> None:
         """
@@ -198,7 +223,7 @@ class EmailChannel(BaseChannel):
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to send email for notification {notification.id}: {e}")
 
-    def send_digest(self, notifications: "QuerySet[Notification]", frequency: type[BaseFrequency] | None = None):
+    def send_digest(self, notifications: "QuerySet[Notification]", frequency: type[BaseFrequency]):
         """
         Send a digest email with specific notifications.
         This method is used by the management command.
@@ -240,8 +265,7 @@ class EmailChannel(BaseChannel):
                 subject = render_to_string(subject_template, context).strip()
             except Exception:
                 # Fallback subject
-                frequency_name = frequency.name if frequency else "Digest"
-                subject = f"{frequency_name} - {notifications_count} new notification{pluralize(notifications_count)}"
+                subject = f"{frequency.name} - {notifications_count} new notification{pluralize(notifications_count)}"
 
             # Load HTML message
             try:
