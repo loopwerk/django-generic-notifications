@@ -1,4 +1,4 @@
-from generic_notifications.channels import EmailChannel
+from generic_notifications.channels import EmailChannel, WebsiteChannel
 from generic_notifications.types import NotificationType, register
 
 
@@ -7,6 +7,7 @@ class CommentNotificationType(NotificationType):
     key = "comment_notification"
     name = "Comments"
     description = "You received a comment"
+    default_channels = [WebsiteChannel]
 
 
 @register
