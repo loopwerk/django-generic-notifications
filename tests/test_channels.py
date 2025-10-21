@@ -224,9 +224,9 @@ class EmailChannelTest(TestCase):
         def mock_select_side_effect(template_list):
             if "subject.txt" in template_list[1]:
                 return MockTemplate("Fallback Subject")
-            elif "body.html" in template_list[1]:
+            elif "message.html" in template_list[1]:
                 return MockTemplate("<html>Fallback HTML Body</html>")
-            elif "body.txt" in template_list[1]:
+            elif "message.txt" in template_list[1]:
                 return MockTemplate("Fallback Text Body")
             raise TemplateDoesNotExist("No templates found")
 

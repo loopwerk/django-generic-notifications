@@ -176,11 +176,11 @@ class EmailChannel(BaseChannel):
             ]
             html_templates = [
                 f"notifications/email/realtime/{notification.notification_type}.html",
-                "notifications/email/realtime/body.html",
+                "notifications/email/realtime/message.html",
             ]
             text_templates = [
                 f"notifications/email/realtime/{notification.notification_type}.txt",
-                "notifications/email/realtime/body.txt",
+                "notifications/email/realtime/message.txt",
             ]
 
             # Load subject
