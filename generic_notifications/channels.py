@@ -166,6 +166,7 @@ class EmailChannel(BaseChannel):
             context = {
                 "notification": notification,
                 "user": notification.recipient,
+                "recipient": notification.recipient,
                 "actor": notification.actor,
                 "target": notification.target,
             }
@@ -249,6 +250,7 @@ class EmailChannel(BaseChannel):
 
             context = {
                 "user": user,
+                "recipient": user,
                 "notifications": notifications,
                 "notifications_by_type": notifications_by_type,
                 "count": notifications.count(),

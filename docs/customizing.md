@@ -139,8 +139,23 @@ If notification-type specific templates are not found, the system will fall back
 
 This allows you to create generic templates that work for all notification types while still having the flexibility to create specific templates for certain types.
 
+**Template context:**
+
+- `recipient`: The recipient user (same as `notification.recipient`)
+- `notification`: The `Notification` instance
+- `actor`: The actor who triggered the notification (if any)
+- `target`: The target object of the notification (if any)
+
 ### Digest emails
 
 - `notifications/email/digest/subject.txt`
 - `notifications/email/digest/message.html`
 - `notifications/email/digest/message.txt`
+
+**Template context:**
+
+- `recipient`: The recipient user
+- `notifications`: Queryset of all notifications in the digest
+- `notifications_by_type`: Dictionary grouping notifications by their type
+- `count`: Total number of notifications in the digest
+- `frequency`: The frequency instance (e.g., `DailyFrequency`)
