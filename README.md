@@ -173,6 +173,10 @@ While the library doesn't register admin classes by default, the example app inc
 - [User preferences: how to manage user preferences](https://github.com/loopwerk/django-generic-notifications/tree/main/docs/preferences.md)
 - [Development: workflows for working on this library](https://github.com/loopwerk/django-generic-notifications/tree/main/docs/development.md)
 
+## Sponsored By
+
+A huge thanks goes to https://dskrpt.de/ for sponsoring development of django-generic-notifications.
+
 ## License
 
 MIT License - see LICENSE file for details.
