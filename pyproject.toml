@@ -22,6 +22,7 @@ keywords = [
 classifiers = [
   "License :: OSI Approved :: MIT License",
   "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
   "Framework :: Django",
   "Framework :: Django :: 4.2",
   "Framework :: Django :: 5.0",
