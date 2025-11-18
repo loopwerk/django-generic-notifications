@@ -4,6 +4,56 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def remove_postgresql_indexes(apps, schema_editor):
+    """Remove PostgreSQL-specific indexes. Skip on other databases where they were never created."""
+    if schema_editor.connection.vendor != "postgresql":
+        return
+
+    Notification = apps.get_model("generic_notifications", "Notification")
+
+    # Import here to avoid issues with apps registry
+    import django.contrib.postgres.indexes
+
+    # Remove the indexes that were created in migration 0001
+    schema_editor.remove_index(
+        Notification, django.contrib.postgres.indexes.GinIndex(fields=["channels"], name="notification_channels_gin")
+    )
+    schema_editor.remove_index(
+        Notification, models.Index(fields=["recipient", "read", "channels"], name="notification_unread_channel")
+    )
+    schema_editor.remove_index(
+        Notification, models.Index(fields=["recipient", "channels"], name="notification_recipient_channel")
+    )
+    schema_editor.remove_index(
+        Notification,
+        models.Index(fields=["recipient", "email_sent_at", "read", "channels"], name="notification_user_email_digest"),
+    )
+
+
+def recreate_postgresql_indexes(apps, schema_editor):
+    """Reverse operation: recreate the PostgreSQL indexes."""
+    if schema_editor.connection.vendor != "postgresql":
+        return
+
+    Notification = apps.get_model("generic_notifications", "Notification")
+
+    import django.contrib.postgres.indexes
+
+    schema_editor.add_index(
+        Notification, django.contrib.postgres.indexes.GinIndex(fields=["channels"], name="notification_channels_gin")
+    )
+    schema_editor.add_index(
+        Notification, models.Index(fields=["recipient", "read", "channels"], name="notification_unread_channel")
+    )
+    schema_editor.add_index(
+        Notification, models.Index(fields=["recipient", "channels"], name="notification_recipient_channel")
+    )
+    schema_editor.add_index(
+        Notification,
+        models.Index(fields=["recipient", "email_sent_at", "read", "channels"], name="notification_user_email_digest"),
+    )
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("contenttypes", "0002_remove_content_type_name"),
@@ -12,21 +62,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveIndex(
-            model_name="notification",
-            name="notification_channels_gin",
-        ),
-        migrations.RemoveIndex(
-            model_name="notification",
-            name="notification_unread_channel",
-        ),
-        migrations.RemoveIndex(
-            model_name="notification",
-            name="notification_recipient_channel",
-        ),
-        migrations.RemoveIndex(
-            model_name="notification",
-            name="notification_user_email_digest",
+        # Remove PostgreSQL-specific indexes (skipped on SQL Server and other databases)
+        migrations.RunPython(
+            code=remove_postgresql_indexes,
+            reverse_code=recreate_postgresql_indexes,
         ),
         migrations.RemoveField(
             model_name="notification",

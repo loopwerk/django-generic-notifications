@@ -6,6 +6,50 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def create_postgresql_indexes(apps, schema_editor):
+    """Create indexes on PostgreSQL only. Other databases don't support JSONField indexes."""
+    if schema_editor.connection.vendor != "postgresql":
+        return
+
+    Notification = apps.get_model("generic_notifications", "Notification")
+
+    schema_editor.add_index(
+        Notification, django.contrib.postgres.indexes.GinIndex(fields=["channels"], name="notification_channels_gin")
+    )
+    schema_editor.add_index(
+        Notification, models.Index(fields=["recipient", "read", "channels"], name="notification_unread_channel")
+    )
+    schema_editor.add_index(
+        Notification, models.Index(fields=["recipient", "channels"], name="notification_recipient_channel")
+    )
+    schema_editor.add_index(
+        Notification,
+        models.Index(fields=["recipient", "email_sent_at", "read", "channels"], name="notification_user_email_digest"),
+    )
+
+
+def drop_postgresql_indexes(apps, schema_editor):
+    """Reverse operation: drop the PostgreSQL indexes."""
+    if schema_editor.connection.vendor != "postgresql":
+        return
+
+    Notification = apps.get_model("generic_notifications", "Notification")
+
+    schema_editor.remove_index(
+        Notification, django.contrib.postgres.indexes.GinIndex(fields=["channels"], name="notification_channels_gin")
+    )
+    schema_editor.remove_index(
+        Notification, models.Index(fields=["recipient", "read", "channels"], name="notification_unread_channel")
+    )
+    schema_editor.remove_index(
+        Notification, models.Index(fields=["recipient", "channels"], name="notification_recipient_channel")
+    )
+    schema_editor.remove_index(
+        Notification,
+        models.Index(fields=["recipient", "email_sent_at", "read", "channels"], name="notification_user_email_digest"),
+    )
+
+
 class Migration(migrations.Migration):
     initial = True
 
@@ -97,14 +141,11 @@ class Migration(migrations.Migration):
             ],
             options={
                 "ordering": ["-added"],
-                "indexes": [
-                    django.contrib.postgres.indexes.GinIndex(fields=["channels"], name="notification_channels_gin"),
-                    models.Index(fields=["recipient", "read", "channels"], name="notification_unread_channel"),
-                    models.Index(fields=["recipient", "channels"], name="notification_recipient_channel"),
-                    models.Index(
-                        fields=["recipient", "email_sent_at", "read", "channels"], name="notification_user_email_digest"
-                    ),
-                ],
             },
+        ),
+        # Create PostgreSQL-specific indexes (skipped on SQL Server and other databases)
+        migrations.RunPython(
+            code=create_postgresql_indexes,
+            reverse_code=drop_postgresql_indexes,
         ),
     ]
