@@ -87,7 +87,6 @@ class SendNotificationTest(TestCase):
         self.assertIsNone(notification.target)
 
         # Verify both channels were created
-
         channels = NotificationChannel.objects.filter(notification=notification)
         self.assertEqual(channels.count(), 2)
         channel_names = [c.channel for c in channels]
