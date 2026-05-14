@@ -4,10 +4,10 @@ from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase, override_settings
 
-from generic_notifications import send_notification
+from generic_notifications import send_notification, send_notifications
 from generic_notifications.channels import EmailChannel, WebsiteChannel
 from generic_notifications.frequencies import RealtimeFrequency
-from generic_notifications.models import Notification
+from generic_notifications.models import Notification, NotificationChannel
 from generic_notifications.registry import registry
 from generic_notifications.types import NotificationType
 from generic_notifications.utils import get_notifications, get_unread_count, mark_notifications_as_read
@@ -87,8 +87,6 @@ class SendNotificationTest(TestCase):
         self.assertIsNone(notification.target)
 
         # Verify both channels were created
-        from generic_notifications.models import NotificationChannel
-
         channels = NotificationChannel.objects.filter(notification=notification)
         self.assertEqual(channels.count(), 2)
         channel_names = [c.channel for c in channels]
@@ -204,6 +202,242 @@ class SendNotificationTest(TestCase):
 
         # Verify no email was sent
         self.assertEqual(len(mail.outbox), 0)
+
+
+class SendNotificationsTest(TestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(username="test1", email="test1@example.com", password="testpass")
+        self.user2 = User.objects.create_user(username="test2", email="test2@example.com", password="testpass")
+        self.actor = User.objects.create_user(username="actor", email="actor@example.com", password="testpass")
+        self.recipients = [self.user1, self.user2]
+
+        # Register test notification type
+        self.notification_type = TestNotificationType
+        registry.register_type(TestNotificationType)
+
+    def tearDown(self):
+        mail.outbox.clear()
+
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
+    def test_send_notifications_basic(self):
+        notification_count = send_notifications(
+            recipients=self.recipients,
+            notification_type=self.notification_type,
+            subject="Test Subject",
+            text="Test message",
+        )
+
+        # Verify both notifications were created
+        self.assertEqual(notification_count, 2)
+
+        notifications = Notification.objects.filter(
+            recipient__in=self.recipients,
+            notification_type=self.notification_type.key,
+            subject="Test Subject",
+            text="Test message",
+            actor=None,
+        )
+        self.assertEqual(notifications.count(), 2)
+        self.assertIsNone(notifications[0].target)
+        self.assertIsNone(notifications[1].target)
+
+        # Verify both channels were created for each notification
+        channels = NotificationChannel.objects.filter(notification=notifications[0])
+        self.assertEqual(channels.count(), 2)
+        channel_names = [c.channel for c in channels]
+        self.assertIn("website", channel_names)
+        self.assertIn("email", channel_names)
+        channels = NotificationChannel.objects.filter(notification=notifications[1])
+        self.assertEqual(channels.count(), 2)
+        channel_names = [c.channel for c in channels]
+        self.assertIn("website", channel_names)
+        self.assertIn("email", channel_names)
+
+        # Verify emails were sent
+        self.assertEqual(len(mail.outbox), 2)
+        email = mail.outbox[0]
+        self.assertEqual(email.to, [self.user1.email])
+        self.assertIn("Test Subject", email.subject)
+        email = mail.outbox[1]
+        self.assertEqual(email.to, [self.user2.email])
+        self.assertIn("Test Subject", email.subject)
+
+    def test_send_notifications_with_actor_and_target(self):
+        url = "/test/url"
+        metadata = {"key": "value"}
+        notification_count = send_notifications(
+            recipients=self.recipients,
+            notification_type=self.notification_type,
+            actor=self.actor,
+            target=self.actor,  # Using actor as target for simplicity
+            url=url,
+            metadata=metadata,
+        )
+
+        # Verify both notifications were created
+        self.assertEqual(notification_count, 2)
+
+        notifications = Notification.objects.filter(
+            recipient__in=self.recipients,
+            notification_type=self.notification_type.key,
+            actor=self.actor,
+            url=url,
+            metadata=metadata,
+        )
+        self.assertEqual(notifications.count(), 2)
+        self.assertEqual(notifications[0].target, self.actor)
+        self.assertEqual(notifications[1].target, self.actor)
+
+    def test_send_notifications_invalid_type(self):
+        class InvalidNotificationType(NotificationType):
+            key = "invalid_type"
+            name = "Invalid Type"
+            description = ""
+
+        invalid_type = InvalidNotificationType
+        with self.assertRaises(ValueError) as cm:
+            send_notifications(recipients=self.recipients, notification_type=invalid_type)
+
+        self.assertIn("not registered", str(cm.exception))
+
+    @override_settings(DEFAULT_FROM_EMAIL="test@example.com")
+    def test_send_notifications_with_disabled_channel(self):
+        subject = "Test Subject"
+        text = "Test message"
+
+        # Disable website channel for one user
+        self.notification_type.disable_channel(self.user1, WebsiteChannel)
+
+        notification_count = send_notifications(
+            recipients=self.recipients,
+            notification_type=self.notification_type,
+            subject=subject,
+            text=text,
+        )
+
+        # Verify both notifications were created
+        self.assertEqual(notification_count, 2)
+
+        notifications = Notification.objects.filter(
+            recipient__in=self.recipients,
+            notification_type=self.notification_type.key,
+            subject=subject,
+            text=text,
+        )
+        self.assertEqual(notifications.count(), 2)
+
+        # Notification should only have email channel for user1
+        notification = notifications.get(recipient=self.user1)
+        channel_keys = notification.get_channels()
+        self.assertNotIn("website", channel_keys)
+        self.assertIn("email", channel_keys)
+        self.assertEqual(len(channel_keys), 1)
+
+        # Notification should both channels for user2
+        notification = notifications.get(recipient=self.user2)
+        channel_keys = notification.get_channels()
+        self.assertIn("website", channel_keys)
+        self.assertIn("email", channel_keys)
+        self.assertEqual(len(channel_keys), 2)
+
+        # Verify emails was sent
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_send_notifications_with_all_channels_disabled(self):
+        # Disable both channels for user1
+        self.notification_type.disable_channel(self.user1, WebsiteChannel)
+        self.notification_type.disable_channel(self.user1, EmailChannel)
+
+        notification_count = send_notifications(
+            recipients=self.recipients,
+            notification_type=self.notification_type,
+        )
+
+        # Verify only one notification was created
+        self.assertEqual(notification_count, 1)
+
+        notifications = Notification.objects.filter(
+            recipient__in=self.recipients,
+            notification_type=self.notification_type.key,
+        )
+        self.assertEqual(notifications.count(), 1)
+
+    def test_send_notifications_with_forbidden_channels(self):
+        # Create a notification type with forbidden channels
+        class ForbiddenTestType(NotificationType):
+            key = "forbidden_test"
+            name = "Forbidden Test"
+            forbidden_channels = [WebsiteChannel]
+
+        registry.register_type(ForbiddenTestType)
+
+        notification_count = send_notifications(
+            recipients=self.recipients,
+            notification_type=ForbiddenTestType,
+        )
+
+        # Verify both notifications were created
+        self.assertEqual(notification_count, 2)
+
+        notifications = Notification.objects.filter(
+            recipient__in=self.recipients,
+            notification_type=ForbiddenTestType.key,
+        )
+        self.assertEqual(notifications.count(), 2)
+
+        # All notifications should only have email channel (website is forbidden)
+        for notification in notifications:
+            channel_keys = notification.get_channels()
+            self.assertNotIn("website", channel_keys)
+            self.assertIn("email", channel_keys)
+            self.assertEqual(len(channel_keys), 1)
+
+    def test_send_notifications_without_email_no_mail_sent(self):
+        """Test that no email is sent when recipient has no email address"""
+        # Create user without email
+        user_no_email = User.objects.create_user(username="nomail", password="testpass")
+        user_no_email.email = ""
+        user_no_email.save()
+
+        subject = "Test Subject"
+        text = "Test message"
+        recipients = [user_no_email, self.user1]
+
+        # Send notifications
+        notification_count = send_notifications(
+            recipients=recipients,
+            notification_type=self.notification_type,
+            subject=subject,
+            text=text,
+        )
+
+        # Verify both notifications were created
+        self.assertEqual(notification_count, 2)
+
+        notifications = Notification.objects.filter(
+            recipient__in=recipients,
+            notification_type=self.notification_type.key,
+            subject=subject,
+            text=text,
+        )
+        self.assertEqual(notifications.count(), 2)
+
+        # user_no_email should only have website channel
+        channel_keys = notifications.get(recipient=user_no_email).get_channels()
+        self.assertNotIn("email", channel_keys)
+        self.assertIn("website", channel_keys)
+        self.assertEqual(len(channel_keys), 1)
+        # user1 should have both channels
+        channel_keys = notifications.get(recipient=self.user1).get_channels()
+        self.assertIn("website", channel_keys)
+        self.assertIn("email", channel_keys)
+        self.assertEqual(len(channel_keys), 2)
+
+        # Verify only one email was sent
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertEqual(email.to, [self.user1.email])
+        self.assertIn("Test Subject", email.subject)
 
 
 class MarkNotificationsAsReadTest(TestCase):
