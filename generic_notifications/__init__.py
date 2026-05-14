@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Any, Iterable, List
+from typing import TYPE_CHECKING, Any, Iterable
 
 from django.db import transaction
 
@@ -112,7 +112,7 @@ def send_notifications(
     url: str = "",
     metadata: dict[str, Any] | None = None,
     **kwargs,
-) -> List[Notification | None]:
+) -> int:
     """
     Send notifications to multiple users through all registered channels.
 
@@ -128,13 +128,14 @@ def send_notifications(
         **kwargs: Any additional fields for the notification model
 
     Returns:
-        List of Notification instances
+        Number of notifications that were sent successfully
 
     Raises:
         ValueError: If notification_type is not registered
     """
-    notifications = [
-        send_notification(
+    success_counter = 0
+    for recipient in recipients:
+        notification = send_notification(
             recipient=recipient,
             notification_type=notification_type,
             actor=actor,
@@ -145,6 +146,6 @@ def send_notifications(
             metadata=metadata,
             **kwargs,
         )
-        for recipient in recipients
-    ]
-    return notifications
+        if notification is not None:
+            success_counter += 1
+    return success_counter
