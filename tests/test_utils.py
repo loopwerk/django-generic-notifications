@@ -79,6 +79,7 @@ class SendNotificationTest(TestCase):
         )
 
         self.assertIsInstance(notification, Notification)
+        assert notification is not None
         self.assertEqual(notification.recipient, self.user)
         self.assertEqual(notification.notification_type, "test_type")
         self.assertEqual(notification.subject, "Test Subject")
@@ -109,6 +110,7 @@ class SendNotificationTest(TestCase):
             metadata={"key": "value"},
         )
 
+        assert notification is not None
         self.assertEqual(notification.actor, self.actor)
         self.assertEqual(notification.target, self.actor)
         self.assertEqual(notification.url, "/test/url")
@@ -139,6 +141,7 @@ class SendNotificationTest(TestCase):
         )
 
         # Notification should only have email channel
+        assert notification is not None
         channel_keys = notification.get_channels()
         self.assertNotIn("website", channel_keys)
         self.assertIn("email", channel_keys)
@@ -170,6 +173,7 @@ class SendNotificationTest(TestCase):
 
         # Should only have email channel (website is forbidden)
         self.assertIsNotNone(notification)
+        assert notification is not None
         channel_keys = notification.get_channels()
         self.assertNotIn("website", channel_keys)
         self.assertIn("email", channel_keys)
@@ -194,8 +198,6 @@ class SendNotificationTest(TestCase):
         self.assertIsNotNone(notification)
 
         # Verify only website channel was created (not email)
-        from generic_notifications.models import NotificationChannel
-
         channels = NotificationChannel.objects.filter(notification=notification)
         self.assertEqual(channels.count(), 1)
         self.assertEqual(channels.first().channel, "website")
@@ -648,6 +650,7 @@ class NotificationGroupingTest(TestCase):
         self.assertIsNone(notification2)
 
         # Original notification should be updated
+        assert notification1 is not None
         notification1.refresh_from_db()
         self.assertEqual(notification1.metadata["count"], 2)
 
@@ -675,6 +678,8 @@ class NotificationGroupingTest(TestCase):
 
         self.assertIsNotNone(notification1)
         self.assertIsNotNone(notification2)
+        assert notification1 is not None
+        assert notification2 is not None
         self.assertNotEqual(notification1.id, notification2.id)
         self.assertEqual(Notification.objects.filter(recipient=self.user, notification_type="grouping_type").count(), 2)
 
@@ -699,6 +704,8 @@ class NotificationGroupingTest(TestCase):
 
         self.assertIsNotNone(notification1)
         self.assertIsNotNone(notification2)
+        assert notification1 is not None
+        assert notification2 is not None
         self.assertNotEqual(notification1.id, notification2.id)
         self.assertEqual(Notification.objects.filter(recipient=self.user, notification_type="grouping_type").count(), 2)
 
@@ -712,6 +719,7 @@ class NotificationGroupingTest(TestCase):
         )
 
         # Mark it as read
+        assert notification1 is not None
         notification1.mark_as_read()
 
         # Second notification should create new one (not group with read notification)
@@ -724,6 +732,7 @@ class NotificationGroupingTest(TestCase):
 
         self.assertIsNotNone(notification1)
         self.assertIsNotNone(notification2)
+        assert notification2 is not None
         self.assertNotEqual(notification1.id, notification2.id)
 
     def test_grouping_updates_metadata_multiple_times(self):
@@ -746,6 +755,7 @@ class NotificationGroupingTest(TestCase):
             self.assertIsNone(result)
 
         # Check count was incremented correctly
+        assert notification1 is not None
         notification1.refresh_from_db()
         self.assertEqual(notification1.metadata["count"], 4)
 

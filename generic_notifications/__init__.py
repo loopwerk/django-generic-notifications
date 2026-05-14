@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING, Any, Iterable
 
@@ -10,7 +12,7 @@ if TYPE_CHECKING:
 
 def send_notification(
     recipient: Any,
-    notification_type: "type[NotificationType]",
+    notification_type: type[NotificationType],
     actor: Any | None = None,
     target: Any | None = None,
     subject: str = "",
@@ -101,6 +103,8 @@ def send_notification(
 
             return notification
 
+    return None
+
 
 def send_notifications(
     recipients: Iterable[Any],
@@ -133,9 +137,8 @@ def send_notifications(
     Raises:
         ValueError: If notification_type is not registered
     """
-    success_counter = 0
-    for recipient in recipients:
-        notification = send_notification(
+    return sum(
+        send_notification(
             recipient=recipient,
             notification_type=notification_type,
             actor=actor,
@@ -146,6 +149,6 @@ def send_notifications(
             metadata=metadata,
             **kwargs,
         )
-        if notification is not None:
-            success_counter += 1
-    return success_counter
+        is not None
+        for recipient in recipients
+    )

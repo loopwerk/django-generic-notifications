@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Type
+from typing import TYPE_CHECKING, Any
 
 from .channels import BaseChannel, EmailChannel
 from .frequencies import BaseFrequency, DailyFrequency, RealtimeFrequency
@@ -17,16 +19,16 @@ class NotificationType(ABC):
     key: str
     name: str
     description: str
-    default_frequency: Type[BaseFrequency] = DailyFrequency
-    required_channels: list[Type[BaseChannel]] = []
-    forbidden_channels: list[Type[BaseChannel]] = []
-    default_channels: list[Type[BaseChannel]] | None = None
+    default_frequency: type[BaseFrequency] = DailyFrequency
+    required_channels: list[type[BaseChannel]] = []
+    forbidden_channels: list[type[BaseChannel]] = []
+    default_channels: list[type[BaseChannel]] | None = None
 
     def __str__(self) -> str:
         return self.name
 
     @classmethod
-    def should_save(cls, notification: "Notification") -> bool:
+    def should_save(cls, notification: Notification) -> bool:
         """
         A hook to prevent the saving of a new notification. You can use
         this hook to find similar (unread) notifications and then instead
@@ -38,14 +40,14 @@ class NotificationType(ABC):
         """
         return True
 
-    def get_subject(self, notification: "Notification") -> str:
+    def get_subject(self, notification: Notification) -> str:
         """
         Generate dynamic subject based on notification data.
         Override this in subclasses for custom behavior.
         """
         return ""
 
-    def get_text(self, notification: "Notification") -> str:
+    def get_text(self, notification: Notification) -> str:
         """
         Generate dynamic text based on notification data.
         Override this in subclasses for custom behavior.
@@ -53,7 +55,7 @@ class NotificationType(ABC):
         return ""
 
     @classmethod
-    def set_frequency(cls, user: Any, frequency: Type[BaseFrequency]) -> None:
+    def set_frequency(cls, user: Any, frequency: type[BaseFrequency]) -> None:
         """
         Set the delivery frequency for this notification type for a user.
 
@@ -68,7 +70,7 @@ class NotificationType(ABC):
         )
 
     @classmethod
-    def get_frequency(cls, user: Any) -> Type[BaseFrequency]:
+    def get_frequency(cls, user: Any) -> type[BaseFrequency]:
         """
         Get the delivery frequency for this notification type for a user.
 
@@ -99,7 +101,7 @@ class NotificationType(ABC):
         NotificationFrequencyPreference.objects.filter(user=user, notification_type=cls.key).delete()
 
     @classmethod
-    def get_enabled_channels(cls, user: Any) -> list[Type[BaseChannel]]:
+    def get_enabled_channels(cls, user: Any) -> list[type[BaseChannel]]:
         """
         Get all enabled channels for this notification type for a user.
         This is more efficient than calling is_channel_enabled for each channel individually.
@@ -151,7 +153,7 @@ class NotificationType(ABC):
         return enabled_channels
 
     @classmethod
-    def disable_channel(cls, user: Any, channel: Type[BaseChannel]) -> None:
+    def disable_channel(cls, user: Any, channel: type[BaseChannel]) -> None:
         """
         Disable a channel for this notification type for a user.
 
@@ -166,7 +168,7 @@ class NotificationType(ABC):
         )
 
     @classmethod
-    def enable_channel(cls, user: Any, channel: Type[BaseChannel]) -> None:
+    def enable_channel(cls, user: Any, channel: type[BaseChannel]) -> None:
         """
         Enable a channel for this notification type for a user.
 
@@ -181,7 +183,7 @@ class NotificationType(ABC):
         )
 
 
-def register(cls: Type[NotificationType]) -> Type[NotificationType]:
+def register(cls: type[NotificationType]) -> type[NotificationType]:
     """
     Decorator that registers a NotificationType subclass.
 
@@ -210,13 +212,13 @@ class SystemMessage(NotificationType):
     default_frequency = RealtimeFrequency
     required_channels = [EmailChannel]
 
-    def get_subject(self, notification: "Notification") -> str:
+    def get_subject(self, notification: Notification) -> str:
         """Generate subject for system messages."""
         if notification.subject:
             return notification.subject
         return f"System Message: {self.name}"
 
-    def get_text(self, notification: "Notification") -> str:
+    def get_text(self, notification: Notification) -> str:
         """Generate text for system messages."""
         if notification.text:
             return notification.text

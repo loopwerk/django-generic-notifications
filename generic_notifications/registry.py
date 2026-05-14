@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Type
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .channels import BaseChannel
@@ -13,9 +15,9 @@ class NotificationRegistry:
     """
 
     def __init__(self) -> None:
-        self._type_classes: dict[str, Type["NotificationType"]] = {}
-        self._channel_classes: dict[str, Type["BaseChannel"]] = {}
-        self._frequency_classes: dict[str, Type["BaseFrequency"]] = {}
+        self._type_classes: dict[str, type[NotificationType]] = {}
+        self._channel_classes: dict[str, type[BaseChannel]] = {}
+        self._frequency_classes: dict[str, type[BaseFrequency]] = {}
         self._registered_class_ids: set[int] = set()
 
     def _register(self, cls, base_class, registry_dict: dict, class_type_name: str, force: bool = False) -> None:
@@ -36,53 +38,53 @@ class NotificationRegistry:
         registry_dict[cls.key] = cls
         self._registered_class_ids.add(class_id)
 
-    def register_type(self, notification_type_class: Type["NotificationType"], force: bool = False) -> None:
+    def register_type(self, notification_type_class: type[NotificationType], force: bool = False) -> None:
         """Register a notification type class"""
         from .types import NotificationType
 
         self._register(notification_type_class, NotificationType, self._type_classes, "NotificationType", force)
 
-    def register_channel(self, channel_class: Type["BaseChannel"], force: bool = False) -> None:
+    def register_channel(self, channel_class: type[BaseChannel], force: bool = False) -> None:
         """Register a notification channel class"""
         from .channels import BaseChannel
 
         self._register(channel_class, BaseChannel, self._channel_classes, "BaseChannel", force)
 
-    def register_frequency(self, frequency_class: Type["BaseFrequency"], force: bool = False) -> None:
+    def register_frequency(self, frequency_class: type[BaseFrequency], force: bool = False) -> None:
         """Register a frequency option class"""
         from .frequencies import BaseFrequency
 
         self._register(frequency_class, BaseFrequency, self._frequency_classes, "BaseFrequency", force)
 
-    def get_type(self, key: str) -> Type["NotificationType"]:
+    def get_type(self, key: str) -> type[NotificationType]:
         """Get a registered notification type class by key"""
         return self._type_classes[key]
 
-    def get_channel(self, key: str) -> Type["BaseChannel"]:
+    def get_channel(self, key: str) -> type[BaseChannel]:
         """Get a registered channel class by key"""
         return self._channel_classes[key]
 
-    def get_frequency(self, key: str) -> Type["BaseFrequency"]:
+    def get_frequency(self, key: str) -> type[BaseFrequency]:
         """Get a registered frequency class by key"""
         return self._frequency_classes[key]
 
-    def get_all_types(self) -> list[Type["NotificationType"]]:
+    def get_all_types(self) -> list[type[NotificationType]]:
         """Get all registered notification type classes"""
         return list(self._type_classes.values())
 
-    def get_all_channels(self) -> list[Type["BaseChannel"]]:
+    def get_all_channels(self) -> list[type[BaseChannel]]:
         """Get all registered channel classes"""
         return list(self._channel_classes.values())
 
-    def get_all_frequencies(self) -> list[Type["BaseFrequency"]]:
+    def get_all_frequencies(self) -> list[type[BaseFrequency]]:
         """Get all registered frequency classes"""
         return list(self._frequency_classes.values())
 
-    def get_realtime_frequencies(self) -> list[Type["BaseFrequency"]]:
+    def get_realtime_frequencies(self) -> list[type[BaseFrequency]]:
         """Get all frequencies marked as realtime"""
         return [cls for cls in self._frequency_classes.values() if cls.is_realtime]
 
-    def unregister_type(self, type_class: Type["NotificationType"]) -> bool:
+    def unregister_type(self, type_class: type[NotificationType]) -> bool:
         """
         Unregister a notification type by class.
 
@@ -94,7 +96,7 @@ class NotificationRegistry:
         """
         return self._type_classes.pop(type_class.key, None) is not None
 
-    def unregister_channel(self, channel_class: Type["BaseChannel"]) -> bool:
+    def unregister_channel(self, channel_class: type[BaseChannel]) -> bool:
         """
         Unregister a channel by class.
 
@@ -106,7 +108,7 @@ class NotificationRegistry:
         """
         return self._channel_classes.pop(channel_class.key, None) is not None
 
-    def unregister_frequency(self, frequency_class: Type["BaseFrequency"]) -> bool:
+    def unregister_frequency(self, frequency_class: type[BaseFrequency]) -> bool:
         """
         Unregister a frequency by class.
 

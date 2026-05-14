@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 from abc import ABC
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.core.mail import send_mail as django_send_mail
@@ -27,7 +29,7 @@ class BaseChannel(ABC):
     enabled_by_default: bool = True
 
     @classmethod
-    def should_send(cls, notification: "Notification") -> bool:
+    def should_send(cls, notification: Notification) -> bool:
         """
         Check if this channel can send the given notification.
         Override in subclasses to add channel-specific validation.
@@ -40,7 +42,7 @@ class BaseChannel(ABC):
         """
         return True
 
-    def process(self, notification: "Notification") -> None:
+    def process(self, notification: Notification) -> None:
         """
         Process a notification through this channel based on channel capabilities
         and user preferences. If the notification should be handled realtime,
@@ -69,7 +71,7 @@ class BaseChannel(ABC):
         if self.supports_realtime:
             self.send_now(notification)
 
-    def send_now(self, notification: "Notification") -> None:
+    def send_now(self, notification: Notification) -> None:
         """
         Send a notification immediately through this channel.
         Override in subclasses that support realtime delivery.
@@ -91,7 +93,7 @@ class BaseChannel(ABC):
         raise NotImplementedError(f"{self.__class__.__name__} does not support digest sending")
 
 
-def register(cls: Type[BaseChannel]) -> Type[BaseChannel]:
+def register(cls: type[BaseChannel]) -> type[BaseChannel]:
     """
     Decorator that registers a NotificationChannel subclass.
 
@@ -123,7 +125,7 @@ class WebsiteChannel(BaseChannel):
     supports_realtime = True
     supports_digest = False
 
-    def send_now(self, notification: "Notification") -> None:
+    def send_now(self, notification: Notification) -> None:
         """
         Website notifications are just stored in DB - no additional processing needed.
         """
@@ -143,7 +145,7 @@ class EmailChannel(BaseChannel):
     supports_digest = True
 
     @classmethod
-    def should_send(cls, notification: "Notification") -> bool:
+    def should_send(cls, notification: Notification) -> bool:
         """
         Check if the recipient has an email address.
 
@@ -155,7 +157,7 @@ class EmailChannel(BaseChannel):
         """
         return bool(getattr(notification.recipient, "email", None))
 
-    def send_now(self, notification: "Notification") -> None:
+    def send_now(self, notification: Notification) -> None:
         """
         Send an individual email notification immediately.
 
@@ -242,7 +244,7 @@ class EmailChannel(BaseChannel):
 
         try:
             # Group notifications by type for better digest formatting
-            notifications_by_type: dict[str, list["Notification"]] = {}
+            notifications_by_type: dict[str, list[Notification]] = {}
             for notification in notifications:
                 if notification.notification_type not in notifications_by_type:
                     notifications_by_type[notification.notification_type] = []
